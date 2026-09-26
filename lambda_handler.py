@@ -66,7 +66,8 @@ OLLAMA_ENDPOINT = os.environ.get("OLLAMA_ENDPOINT", "https://ollama.com/api/chat
 SSM_API_KEY_PARAM = os.environ.get("SSM_API_KEY_PARAM", "/news-pipeline/ollama-api-key")
 SSM_MODEL_PARAM = os.environ.get("SSM_MODEL_PARAM", "/news-pipeline/ollama-model")
 MAX_SUMMARIZE = int(os.environ.get("MAX_SUMMARIZE", "10"))
-ARTICLE_TTL_DAYS = int(os.environ.get("ARTICLE_TTL_DAYS", "90"))
+ARTICLE_TTL_DAYS = int(os.environ.get("ARTICLE_TTL_DAYS", "14"))
+REPORTS_TTL_DAYS = int(os.environ.get("REPORTS_TTL_DAYS", "30"))
 
 ARTICLES_TABLE = ddb_resource.Table(ARTICLES_TABLE_NAME)
 REPORTS_TABLE = ddb_resource.Table(REPORTS_TABLE_NAME)
@@ -680,7 +681,7 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
         ContentType="application/json",
     )
 
-    # Step 10: Store report metadata in DynamoDB
+    # Step 10: Store report metadata in DynamoDB (TTL: REPORTS_TTL_DAYS)
     REPORTS_TABLE.put_item(Item={
         "date": today,
         "s3_key": pdf_key,
@@ -689,6 +690,7 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
         "total_raw": len(all_articles),
         "ai_summaries": ai_count,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "ttl": int(time.time()) + REPORTS_TTL_DAYS * 86400,
     })
 
     result = {

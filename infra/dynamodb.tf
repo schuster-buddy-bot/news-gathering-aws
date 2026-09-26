@@ -29,4 +29,11 @@ resource "aws_dynamodb_table" "reports" {
     name = "date"
     type = "S"
   }
+
+  # Metadata outlives the S3 PDFs (report_retention_days) so the API keeps
+  # a longer history; PDF URLs older than the S3 retention window expire.
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
 }

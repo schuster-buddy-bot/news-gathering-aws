@@ -35,6 +35,7 @@ resource "aws_lambda_function" "pipeline" {
       SSM_MODEL_PARAM  = aws_ssm_parameter.ollama_model.name
       MAX_SUMMARIZE    = tostring(var.max_summarize)
       ARTICLE_TTL_DAYS = tostring(var.article_ttl_days)
+      REPORTS_TTL_DAYS = tostring(var.report_ttl_days)
       LOG_LEVEL        = "INFO"
     }
   }

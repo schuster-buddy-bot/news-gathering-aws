@@ -19,13 +19,19 @@ variable "ollama_model" {
 variable "article_ttl_days" {
   description = "DynamoDB TTL for dedup (seen-article) entries."
   type        = number
-  default     = 90
+  default     = 14
 }
 
 variable "report_retention_days" {
   description = "S3 lifecycle expiration for report PDFs and digest archives."
   type        = number
-  default     = 90
+  default     = 14
+}
+
+variable "report_ttl_days" {
+  description = "DynamoDB TTL for report metadata entries (kept longer than S3 PDFs for API history)."
+  type        = number
+  default     = 30
 }
 
 variable "presign_ttl_seconds" {
