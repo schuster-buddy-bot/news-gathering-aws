@@ -9,8 +9,18 @@ output "health_url" {
 }
 
 output "latest_report_url" {
-  description = "Latest report endpoint URL."
+  description = "Latest report endpoint URL (requires x-api-key)."
   value       = "${aws_api_gateway_stage.v1.invoke_url}/report/latest"
+}
+
+output "search_url" {
+  description = "Semantic search endpoint URL (requires x-api-key)."
+  value       = "${aws_api_gateway_stage.v1.invoke_url}/search"
+}
+
+output "api_key_ssm_name" {
+  description = "SSM parameter holding the API key (SecureString)."
+  value       = aws_ssm_parameter.api_key.name
 }
 
 output "s3_bucket" {

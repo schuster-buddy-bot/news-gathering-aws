@@ -37,16 +37,19 @@ locals {
       resource_id     = aws_api_gateway_rest_api.api.root_resource_id
       path            = "/"
       function        = aws_lambda_function.api
+      api_key_required = false
     }
     health = {
       resource_id     = aws_api_gateway_resource.health.id
       path            = "/health"
       function        = aws_lambda_function.api
+      api_key_required = false
     }
     latest = {
       resource_id     = aws_api_gateway_resource.latest.id
       path            = "/report/latest"
       function        = aws_lambda_function.api
+      api_key_required = true
     }
   }
 }
@@ -62,6 +65,8 @@ resource "aws_api_gateway_method" "get" {
   http_method   = "GET"
   authorization = "NONE"
 
+  api_key_required = each.value.api_key_required
+
   request_parameters = {
     "method.request.header.Accept" = false
   }
@@ -74,6 +79,8 @@ resource "aws_api_gateway_method" "search_get" {
   resource_id   = aws_api_gateway_resource.search.id
   http_method   = "GET"
   authorization = "NONE"
+
+  api_key_required = true
 
   request_parameters = {
     "method.request.querystring.q"     = false
@@ -159,4 +166,37 @@ resource "aws_api_gateway_stage" "v1" {
   tags = {
     Project = var.project
   }
+}
+
+# ─── API key + usage plan (Issue #5) ────────────────────────────────
+# "/search" and "/report/latest" require x-api-key; "/health" and "/" stay public.
+
+resource "aws_api_gateway_api_key" "demo" {
+  name    = "${var.project}-demo-key"
+  enabled = true
+}
+
+resource "aws_api_gateway_usage_plan" "main" {
+  name        = "${var.project}-usage-plan"
+  description = "100 req/min per key: burst bucket 100, sustained 2 rps (=120/min)"
+
+  api_stages {
+    api_id = aws_api_gateway_rest_api.api.id
+    stage  = aws_api_gateway_stage.v1.stage_name
+  }
+
+  throttle_settings {
+    rate_limit  = 2
+    burst_limit = 100
+  }
+
+  tags = {
+    Project = var.project
+  }
+}
+
+resource "aws_api_gateway_usage_plan_key" "demo" {
+  usage_plan_id = aws_api_gateway_usage_plan.main.id
+  key_id        = aws_api_gateway_api_key.demo.id
+  key_type      = "API_KEY"
 }
