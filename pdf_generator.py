@@ -107,6 +107,21 @@ def importance_score(article: dict) -> float:
     return authority * 0.8 + substance
 
 
+def ranking_score(article: dict) -> float:
+    """Ranking key: interest relevance when available, else importance.
+
+    Args:
+        article: Article dict, optionally with ``relevance_score``.
+
+    Returns:
+        Score for ordering (relevance wins when the pipeline scored it).
+    """
+    relevance = article.get("relevance_score")
+    if relevance is not None:
+        return float(relevance)
+    return importance_score(article)
+
+
 def _clean_for_pdf(text: str) -> str:
     """Strip HTML tags and collapse whitespace for clean PDF rendering.
 
@@ -134,13 +149,16 @@ def _article_block(article: dict, show_summary: bool = True) -> list:
     Returns:
         List of flowables for this article.
     """
+    meta = (
+        xml_escape(_clean_for_pdf(article.get("source", "unknown")))
+        + " \u00b7 " + xml_escape(CATEGORY_LABELS.get(article.get("category", ""), article.get("category", "")))
+    )
+    relevance = article.get("relevance_score")
+    if relevance is not None:
+        meta += f" \u00b7 relevance {float(relevance):.2f}"
     block = [
         Paragraph(xml_escape(_clean_for_pdf(article["title"])), STYLE_ARTICLE_TITLE),
-        Paragraph(
-            xml_escape(_clean_for_pdf(article.get("source", "unknown")))
-            + " · " + xml_escape(CATEGORY_LABELS.get(article.get("category", ""), article.get("category", ""))),
-            STYLE_META,
-        ),
+        Paragraph(meta, STYLE_META),
     ]
     if show_summary and article.get("summary"):
         block.append(Spacer(1, 1))
@@ -187,11 +205,11 @@ def generate_report_pdf(
         author="News Pipeline (AWS Lambda)",
     )
 
-    # Collect + score all articles for top picks
+    # Collect + score all articles for top picks (relevance-ranked)
     all_articles: list[dict] = []
     for cat_articles in articles_by_category.values():
         all_articles.extend(cat_articles)
-    scored = sorted(all_articles, key=importance_score, reverse=True)
+    scored = sorted(all_articles, key=ranking_score, reverse=True)
     top_pick_urls = {a["url"] for a in scored[:top_n]}
 
     story: list = []
@@ -212,7 +230,7 @@ def generate_report_pdf(
     if not all_articles:
         story.append(Paragraph("No articles matched today's filters.", STYLE_EMPTY))
     else:
-        # Top Picks
+        # Top Picks (relevance-ranked when relevance scores exist)
         story.append(Paragraph("Top Picks", STYLE_SECTION))
         for article in scored[:top_n]:
             story.extend(_article_block(article, show_summary=True))
@@ -225,7 +243,7 @@ def generate_report_pdf(
             ]
             if not remaining:
                 continue
-            remaining.sort(key=importance_score, reverse=True)
+            remaining.sort(key=ranking_score, reverse=True)
             story.append(Paragraph(xml_escape(CATEGORY_LABELS[cat]), STYLE_SECTION))
             story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
             story.append(Spacer(1, 6))

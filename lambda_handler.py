@@ -35,13 +35,14 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from decimal import Decimal
 from html import unescape
 from typing import Any
 
 import boto3
 import requests
 
-from embeddings import embed_text, pack_base64
+from embeddings import cosine_similarity, embed_text, pack_base64, unpack_base64
 
 try:
     import bleach
@@ -86,6 +87,8 @@ DEFAULT_FETCH_CONFIG = {
     "retry_delay_seconds": 5,
     "parallel_fetches": 10,
 }
+
+DEFAULT_INTERESTS = ["AI agents", "cloud architecture", "security", "DevOps", "machine learning"]
 
 # ─── Source authority (ported from dedup.py) ────────────────────────────────
 
@@ -568,19 +571,96 @@ def store_article_embeddings(articles: list[dict[str, Any]]) -> int:
         if not a.get("embedding"):
             continue
         try:
+            update_expr = "SET #e = :e, #m = :m, #s = :s"
+            names = {"#e": "embedding", "#m": "embedding_model", "#s": "summary"}
+            values = {
+                ":e": a["embedding"],
+                ":m": a.get("embedding_model", ""),
+                ":s": a.get("summary", "")[:300],
+            }
+            if a.get("relevance_score") is not None:
+                update_expr += ", #r = :r"
+                names["#r"] = "relevance_score"
+                values[":r"] = a["relevance_score"]
             ARTICLES_TABLE.update_item(
                 Key={"url_hash": a["fingerprint"]},
-                UpdateExpression="SET #e = :e, #m = :m, #s = :s",
-                ExpressionAttributeNames={"#e": "embedding", "#m": "embedding_model", "#s": "summary"},
-                ExpressionAttributeValues={
-                    ":e": a["embedding"],
-                    ":m": a.get("embedding_model", ""),
-                    ":s": a.get("summary", "")[:300],
-                },
+                UpdateExpression=update_expr,
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
             )
             count += 1
         except Exception as e:  # noqa: BLE001 — storage is per-article, never fatal
             logger.warning("Embedding store failed for '%s': %s", a["title"][:50], e)
+    return count
+
+
+def load_interest_profile(model: str) -> tuple[list[float], list[str]] | tuple[None, None]:
+    """Build the interest profile embedding from S3 config (Task 4).
+
+    Loads ``config/interests.json`` from S3, embeds each interest with the
+    same provider as the articles and averages the vectors (L2-normalized).
+    Falls back to DEFAULT_INTERESTS when the config is missing/broken.
+
+    Args:
+        model: Embedding model/provider identifier.
+
+    Returns:
+        Tuple of (profile_vector, interests) or (None, None) when the
+        provider is unavailable — relevance scoring is then skipped.
+    """
+    config = s3_get_json(CONFIG_BUCKET, "config/interests.json", required=False)
+    interests: list[str] = []
+    if isinstance(config, dict):
+        interests = [str(i) for i in config.get("interests", []) if str(i).strip()]
+    if not interests:
+        interests = DEFAULT_INTERESTS
+        logger.info("interests.json missing/empty — using defaults")
+
+    vectors: list[list[float]] = []
+    for interest in interests:
+        try:
+            vectors.append(embed_text(interest, model))
+        except Exception as e:  # noqa: BLE001 — profile is optional
+            logger.warning("Interest embedding failed for %r: %s", interest, e)
+    if not vectors:
+        logger.warning("No interest vectors — relevance scoring skipped")
+        return None, None
+
+    dims = len(vectors[0])
+    profile = [0.0] * dims
+    for vec in vectors:
+        if len(vec) != dims:
+            continue  # inconsistent provider output — skip
+        for i, v in enumerate(vec):
+            profile[i] += v
+    norm = sum(v * v for v in profile) ** 0.5 or 1.0
+    profile = [v / norm for v in profile]
+    return profile, interests
+
+
+def score_relevance(articles: list[dict[str, Any]], profile: list[float]) -> int:
+    """Cosine-score articles against the interest profile (in-place).
+
+    Args:
+        articles: Articles with an ``embedding`` attribute.
+        profile: L2-normalized interest profile vector.
+
+    Returns:
+        Number of articles scored.
+    """
+    count = 0
+    for a in articles:
+        if not a.get("embedding"):
+            a["relevance_score"] = 0.0
+            continue
+        try:
+            vec = unpack_base64(a["embedding"])
+            # DynamoDB numbers require Decimal (boto3 rejects float)
+            a["relevance_score"] = Decimal(str(round(cosine_similarity(profile, vec), 4)))
+            count += 1
+        except Exception as e:  # noqa: BLE001 — scoring is per-article
+            logger.warning("Relevance scoring failed for '%s': %s", a["title"][:50], e)
+            a["relevance_score"] = 0.0
     return count
 
 
@@ -707,8 +787,18 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
 
     # Step 6.5: Embeddings for the semantic-search corpus (DynamoDB)
     embedding_count = 0
+    relevance_count = 0
     if EMBEDDING_ENABLED and filtered:
         embedding_count, embedding_model = generate_embeddings(filtered)
+
+        # Step 6.6: Interest-profile relevance scoring (Task 4)
+        profile, interests = load_interest_profile(embedding_model)
+        if profile is not None:
+            relevance_count = score_relevance(filtered, profile)
+            logger.info(
+                "Relevance: %s/%s scored vs %s interests", relevance_count, len(filtered), len(interests)
+            )
+
         stored = store_article_embeddings(filtered)
         logger.info(
             "Embeddings: %s/%s generated (%s), %s stored",
@@ -781,6 +871,7 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
         "ai_summaries": ai_count,
         "ai_enabled": ai_enabled,
         "embeddings": embedding_count,
+        "relevance_scored": relevance_count,
         "failed_sources": failed_sources,
         "source_warning_count": len(source_warnings),
         "pdf_key": pdf_key,

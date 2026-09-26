@@ -1,0 +1,11 @@
+{
+  "interests": [
+    "AI agents",
+    "cloud architecture",
+    "security",
+    "DevOps",
+    "machine learning"
+  ],
+  "updated_at": "2026-09-26",
+  "comment": "Profile embedding = average of per-interest embeddings; articles get a cosine relevance_score vs this profile. Editable in S3 without redeploy (s3://<bucket>/config/interests.json)."
+}
