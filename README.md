@@ -11,8 +11,9 @@ Built entirely within the AWS free tier (target: ~$0/month).
 - **44 RSS/Atom sources** fetched in parallel (AI/ML/tech from US, EU, Asia)
 - **Cross-run deduplication** via DynamoDB (URL-hash, TTL-managed)
 - **AI summaries** of the top articles (Ollama chat API, SSM-managed key)
-- **Embeddings + semantic search** — every article gets a 256-dim vector, cosine
-  similarity search at `GET /search?q=...`
+- **Embeddings + semantic search** — every article gets a 256-dim vector from
+  AWS Bedrock Titan Text Embeddings V2 (semantic, L2-normalized; local feature
+  hashing as automatic fallback), cosine similarity search at `GET /search?q=...`
 - **Interest-based ranking** — articles scored against a configurable interest profile,
   PDF "Top Picks" ordered by relevance
 - **Daily PDF report** (reportlab, in-process) + digest JSON archive

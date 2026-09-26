@@ -20,8 +20,10 @@ resource "aws_ssm_parameter" "ollama_model" {
   value = var.ollama_model
 }
 
-# Embedding model/provider selector. "local-hashed[-N]" = stdlib feature
-# hashing (no network); any other value = Ollama /api/embed model name.
+# Embedding model/provider selector. "bedrock:<model-id>" = AWS Bedrock
+# InvokeModel (e.g. bedrock:amazon.titan-embed-text-v2:0); "local-hashed[-N]"
+# = stdlib feature hashing (fallback, no network); any other value = Ollama
+# /api/embed model name.
 resource "aws_ssm_parameter" "embedding_model" {
   name  = "/${var.project}/embedding-model"
   type  = "String"

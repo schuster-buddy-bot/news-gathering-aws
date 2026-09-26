@@ -86,6 +86,14 @@ data "aws_iam_policy_document" "pipeline" {
       "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/embedding-model",
     ]
   }
+
+  # Bedrock: Titan Text Embeddings V2 for article + interest-profile vectors
+  statement {
+    sid    = "BedrockInvoke"
+    effect = "Allow"
+    actions = ["bedrock:InvokeModel"]
+    resources = ["arn:aws:bedrock:${data.aws_region.current.name}::foundation-model/amazon.titan-embed-text-v2:0"]
+  }
 }
 
 resource "aws_iam_role_policy" "pipeline" {
@@ -239,6 +247,14 @@ data "aws_iam_policy_document" "search" {
     resources = [
       "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/embedding-model",
     ]
+  }
+
+  # Bedrock: Titan Text Embeddings V2 for the query vector
+  statement {
+    sid    = "BedrockInvoke"
+    effect = "Allow"
+    actions = ["bedrock:InvokeModel"]
+    resources = ["arn:aws:bedrock:${data.aws_region.current.name}::foundation-model/amazon.titan-embed-text-v2:0"]
   }
 }
 

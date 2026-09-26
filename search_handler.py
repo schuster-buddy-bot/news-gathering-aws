@@ -17,7 +17,7 @@ import os
 
 import boto3
 
-from embeddings import cosine_similarity, embed_text, unpack_base64
+from embeddings import FALLBACK_MODEL, cosine_similarity, embed_text, unpack_base64
 
 logger = logging.getLogger()
 logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
@@ -59,7 +59,7 @@ def _get_model() -> str:
         return resp["Parameter"]["Value"]
     except Exception as e:  # noqa: BLE001 — search must degrade, not fail
         logger.warning("SSM %s unavailable: %s", SSM_EMBEDDING_MODEL_PARAM, e)
-        return "local-hashed-256"
+        return FALLBACK_MODEL
 
 
 def _load_corpus() -> list[dict]:
@@ -71,7 +71,7 @@ def _load_corpus() -> list[dict]:
     """
     kwargs = {
         "FilterExpression": "attribute_exists(#e)",
-        "ProjectionExpression": "#h, #t, #u, #c, #d, #e, #su, #so",
+        "ProjectionExpression": "#h, #t, #u, #c, #d, #e, #su, #so, #em",
         "ExpressionAttributeNames": {
             "#h": "url_hash",
             "#t": "title",
@@ -81,6 +81,7 @@ def _load_corpus() -> list[dict]:
             "#e": "embedding",
             "#su": "summary",
             "#so": "source",
+            "#em": "embedding_model",
         },
     }
     items: list[dict] = []
@@ -133,7 +134,13 @@ def lambda_handler(event: dict, context) -> dict:
 
     items = _load_corpus()
     scored: list[tuple[float, dict]] = []
+    comparable_count = 0
     for item in items:
+        # Provider consistency: only score vectors from the same embedding
+        # space as the query (cross-provider cosine is meaningless).
+        if item.get("embedding_model", "") != model:
+            continue
+        comparable_count += 1
         try:
             vec = unpack_base64(item["embedding"])
         except (KeyError, ValueError):
@@ -162,6 +169,7 @@ def lambda_handler(event: dict, context) -> dict:
         "query": q,
         "model": model,
         "corpus_size": len(items),
+        "comparable_size": comparable_count,
         "count": len(results),
         "results": results,
     })

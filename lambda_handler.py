@@ -10,6 +10,8 @@ Triggers:
   - EventBridge schedule (cron(0 5 * * ? *)) — normal dedup mode
   - Manual invoke: {"force": true} bypasses DynamoDB cross-run dedup
     (for testing / re-runs; in-batch dedup always applies)
+  - Manual invoke: {"test_embed": true} probes the embedding provider
+    (optional "text" payload); returns dims + Base64 blob stats.
 
 Environment variables (set by Terraform):
   CONFIG_BUCKET       S3 bucket holding config + reports
@@ -42,7 +44,14 @@ from typing import Any
 import boto3
 import requests
 
-from embeddings import cosine_similarity, embed_text, pack_base64, unpack_base64
+from embeddings import (
+    BEDROCK_PREFIX,
+    FALLBACK_MODEL,
+    cosine_similarity,
+    embed_text,
+    pack_base64,
+    unpack_base64,
+)
 
 try:
     import bleach
@@ -530,18 +539,24 @@ def summarize_top(articles: list[dict[str, Any]]) -> tuple[int, bool]:
 def generate_embeddings(articles: list[dict[str, Any]]) -> tuple[int, str]:
     """Generate + Base64-pack embeddings for articles (in-place).
 
-    Uses the model from SSM (/news-pipeline/embedding-model). Articles that
-    fail are kept without an embedding (search skips them) — never fatal.
+    Uses the provider from SSM (/news-pipeline/embedding-model) — typically
+    ``bedrock:amazon.titan-embed-text-v2:0``. Graceful degradation: articles
+    that fail are re-tried with the local hashed fallback so the search
+    corpus stays populated even when Bedrock is throttled/unavailable. The
+    per-article ``embedding_model`` attribute records which provider ran.
 
     Args:
         articles: Filtered article list; ``embedding``/``embedding_model``
             keys are added on success.
 
     Returns:
-        Tuple of (embedding_count, model_name).
+        Tuple of (embedding_count, effective_model) — ``effective_model`` is
+        the provider that produced the vectors (falls back to the hashed
+        provider's label when Bedrock failed for every article).
     """
-    model = ssm_get(SSM_EMBEDDING_MODEL_PARAM, "local-hashed-256")
+    model = ssm_get(SSM_EMBEDDING_MODEL_PARAM, FALLBACK_MODEL)
     count = 0
+    bedrock_count = 0
     for a in articles:
         text = f"{a['title']} {a.get('summary') or a.get('description', '')}"[:2000]
         try:
@@ -549,8 +564,21 @@ def generate_embeddings(articles: list[dict[str, Any]]) -> tuple[int, str]:
             a["embedding"] = pack_base64(vec)
             a["embedding_model"] = model
             count += 1
+            if model.startswith(BEDROCK_PREFIX):
+                bedrock_count += 1
         except Exception as e:  # noqa: BLE001 — embedding must not break the pipeline
-            logger.warning("Embedding failed for '%s': %s", a["title"][:50], e)
+            logger.warning("Embedding via %s failed for '%s': %s", model, a["title"][:50], e)
+            try:
+                vec = embed_text(text, FALLBACK_MODEL)
+                a["embedding"] = pack_base64(vec)
+                a["embedding_model"] = FALLBACK_MODEL
+                count += 1
+            except Exception as e2:  # noqa: BLE001 — per-article failure tolerated
+                logger.warning("Fallback embedding failed for '%s': %s", a["title"][:50], e2)
+    if model.startswith(BEDROCK_PREFIX) and count > 0 and bedrock_count == 0:
+        # Bedrock unavailable for the whole batch — the corpus is entirely
+        # hashed vectors, so downstream scoring must use the hashed provider.
+        return count, FALLBACK_MODEL
     return count, model
 
 
@@ -638,12 +666,15 @@ def load_interest_profile(model: str) -> tuple[list[float], list[str]] | tuple[N
     return profile, interests
 
 
-def score_relevance(articles: list[dict[str, Any]], profile: list[float]) -> int:
+def score_relevance(articles: list[dict[str, Any]], profile: list[float], profile_model: str = "") -> int:
     """Cosine-score articles against the interest profile (in-place).
 
     Args:
         articles: Articles with an ``embedding`` attribute.
         profile: L2-normalized interest profile vector.
+        profile_model: Provider label the profile was built with; articles
+            embedded by a different provider are skipped (cross-provider
+            cosine is meaningless).
 
     Returns:
         Number of articles scored.
@@ -651,6 +682,9 @@ def score_relevance(articles: list[dict[str, Any]], profile: list[float]) -> int
     count = 0
     for a in articles:
         if not a.get("embedding"):
+            a["relevance_score"] = 0.0
+            continue
+        if profile_model and a.get("embedding_model") != profile_model:
             a["relevance_score"] = 0.0
             continue
         try:
@@ -794,9 +828,9 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
         # Step 6.6: Interest-profile relevance scoring (Task 4)
         profile, interests = load_interest_profile(embedding_model)
         if profile is not None:
-            relevance_count = score_relevance(filtered, profile)
+            relevance_count = score_relevance(filtered, profile, embedding_model)
             logger.info(
-                "Relevance: %s/%s scored vs %s interests", relevance_count, len(filtered), len(interests)
+                "Relevance: %s/%s scored vs %s interests (%s)", relevance_count, len(filtered), len(interests), embedding_model
             )
 
         stored = store_article_embeddings(filtered)
@@ -920,9 +954,10 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         }
 
     if event.get("test_embed"):
-        model = ssm_get(SSM_EMBEDDING_MODEL_PARAM, "local-hashed-256")
+        model = ssm_get(SSM_EMBEDDING_MODEL_PARAM, FALLBACK_MODEL)
+        text = event.get("text") or "AI agents are transforming cloud architecture"
         try:
-            vec = embed_text("AI agents are transforming cloud architecture", model)
+            vec = embed_text(text, model)
             blob = pack_base64(vec)
             return {
                 "statusCode": 200,

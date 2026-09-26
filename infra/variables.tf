@@ -17,9 +17,9 @@ variable "ollama_model" {
 }
 
 variable "embedding_model" {
-  description = "Embedding provider: 'local-hashed[-N]' (stdlib hashing) or an Ollama model for /api/embed."
+  description = "Embedding provider: 'bedrock:<model-id>' (AWS Bedrock, e.g. bedrock:amazon.titan-embed-text-v2:0), 'local-hashed[-N]' (stdlib hashing fallback) or an Ollama model for /api/embed."
   type        = string
-  default     = "local-hashed-256"
+  default     = "bedrock:amazon.titan-embed-text-v2:0"
 }
 
 variable "article_ttl_days" {

@@ -2,10 +2,15 @@
 embeddings.py — text embedding generation for the news pipeline.
 
 Providers (selected via the embedding-model string, SSM /news-pipeline/embedding-model):
+  bedrock:<model-id>  AWS Bedrock embeddings (e.g.
+                      "bedrock:amazon.titan-embed-text-v2:0"). True semantic
+                      embeddings via bedrock-runtime InvokeModel; 256 dims,
+                      L2-normalized by Bedrock itself (normalize: true).
+                      Input truncated to 8000 chars (Titan V2: 8192 tokens).
   local-hashed[-N]  Deterministic feature-hashing embedder (pure stdlib).
                     Unigrams + bigrams hashed into a fixed-width vector with
                     sublinear TF weighting, L2-normalized. No network, no cost,
-                    no dependency — default for the serverless pipeline.
+                    no dependency — FALLBACK when Bedrock is unavailable.
   <ollama-model>    Remote embeddings via the Ollama API (/api/embed) for a
                     self-hosted Ollama; derived from OLLAMA_ENDPOINT.
 
@@ -13,22 +18,32 @@ Output contract: dense float32 vector packed little-endian and Base64-encoded
 for storage in DynamoDB (``embedding`` attribute). Cosine similarity is
 computed against decoded vectors (see search_handler.py).
 
-Note (Sprint W41): ollama.com's hosted API exposes chat models only
-(/api/embeddings 404, /api/embed 401), so the pipeline defaults to the local
-hashed provider. Switching to a neural embedder later = set the SSM parameter
-to the desired Ollama model name + point OLLAMA_ENDPOINT at an /api/embed-capable host.
+Graceful degradation: the pipeline falls back to ``local-hashed`` per article
+when Bedrock fails; articles record which provider produced their vector via
+the ``embedding_model`` attribute, so search/relevance can stay consistent.
 """
 
 import base64
 import hashlib
+import json
 import math
 import re
 import struct
+import threading
 
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 DEFAULT_DIMS = 256
 BIGRAM_WEIGHT = 1.5  # cheap phrase signal
+
+BEDROCK_PREFIX = "bedrock:"
+BEDROCK_DIMS = 256          # Titan V2 supports 256/512/1024; corpus fixed at 256
+BEDROCK_MAX_CHARS = 8000    # inputText cap (Titan V2 accepts <= 8192 tokens)
+FALLBACK_MODEL = "local-hashed-256"
+
+# Module-level Bedrock client (reused across warm invocations; thread-safe init)
+_bedrock_client = None
+_bedrock_lock = threading.Lock()
 
 
 def _tokens(text: str) -> list[str]:
@@ -138,13 +153,78 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     return sum(x * y for x, y in zip(a, b))  # vectors are L2-normalized at build time
 
 
+def bedrock_embedding(text: str, model_id: str, dims: int = BEDROCK_DIMS) -> list[float]:
+    """Generate an embedding via AWS Bedrock (InvokeModel).
+
+    Args:
+        text: Input text (truncated to BEDROCK_MAX_CHARS; empty/blank input
+            is replaced with a placeholder so Titan never sees an empty string).
+        model_id: Bedrock model ID, e.g. ``amazon.titan-embed-text-v2:0``.
+        dims: Output dimensions (Titan V2: 256/512/1024).
+
+    Returns:
+        Dense float vector, L2-normalized (Bedrock ``normalize: true``).
+
+    Raises:
+        RuntimeError: On Bedrock API failure (throttling, access, payload).
+    """
+    if not text or not text.strip():
+        text = "(empty)"  # Titan rejects empty inputText
+    text = text[:BEDROCK_MAX_CHARS]
+
+    body = json.dumps({
+        "inputText": text,
+        "dimensions": dims,
+        "normalize": True,  # cosine similarity reduces to a dot product
+    })
+    resp = _get_bedrock_client().invoke_model(
+        modelId=model_id,
+        body=body,
+        contentType="application/json",
+        accept="application/json",
+    )
+    result = json.loads(resp["body"].read())
+    embedding = result.get("embedding")
+    if not embedding:
+        raise RuntimeError(f"no embedding in Bedrock response: {str(result)[:200]}")
+    return [float(x) for x in embedding]
+
+
+def _get_bedrock_client():
+    """Return a cached boto3 bedrock-runtime client (adaptive throttling retries).
+
+    Adaptive retry mode absorbs Titan's tight on-demand TPS quota (new AWS
+    accounts are throttled aggressively). The client is built once per
+    container and reused across warm invocations.
+
+    Returns:
+        boto3 ``bedrock-runtime`` client.
+    """
+    global _bedrock_client
+    if _bedrock_client is None:
+        with _bedrock_lock:
+            if _bedrock_client is None:
+                import os
+
+                import boto3
+                from botocore.config import Config
+
+                _bedrock_client = boto3.client(
+                    "bedrock-runtime",
+                    region_name=os.environ.get("AWS_REGION", "eu-central-1"),
+                    config=Config(retries={"max_attempts": 5, "mode": "adaptive"}),
+                )
+    return _bedrock_client
+
+
 def embed_text(text: str, model: str) -> list[float]:
     """Generate an embedding for ``text`` with the configured provider.
 
     Args:
         text: Input text (title + summary recommended).
-        model: Model identifier. ``local-hashed[-N]`` uses local feature
-            hashing; anything else calls the Ollama embed API.
+        model: Model identifier. ``bedrock:<id>`` calls AWS Bedrock;
+            ``local-hashed[-N]`` uses local feature hashing; anything else
+            calls the Ollama embed API.
 
     Returns:
         Dense float vector.
@@ -152,6 +232,9 @@ def embed_text(text: str, model: str) -> list[float]:
     Raises:
         RuntimeError: On remote-provider failure (network/HTTP/API errors).
     """
+    if model.startswith(BEDROCK_PREFIX):
+        return bedrock_embedding(text, model[len(BEDROCK_PREFIX):])
+
     if model.startswith("local-hashed"):
         dims = DEFAULT_DIMS
         parts = model.split("-")
