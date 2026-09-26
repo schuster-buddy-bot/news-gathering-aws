@@ -15,8 +15,8 @@ PLATFORM=manylinux2014_x86_64
 rm -rf build
 mkdir -p build/pipeline build/api
 
-cp lambda_handler.py pdf_generator.py embeddings.py build/pipeline/
-cp api_handler.py search_handler.py embeddings.py build/api/
+cp lambda_handler.py pdf_generator.py embeddings.py source_authority.py build/pipeline/
+cp api_handler.py search_handler.py embeddings.py source_authority.py build/api/
 
 echo "Installing dependencies for Python ${PYV} (${PLATFORM})..."
 if ! python3 -m pip install \

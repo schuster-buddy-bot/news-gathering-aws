@@ -127,7 +127,7 @@ def lambda_handler(event: dict, context) -> dict:
     model = _get_model()
     try:
         query_vec = embed_text(q, model)
-    except Exception as e:  # noqa: BLE001 — surface as 502, keep API alive
+    except Exception:  # noqa: BLE001 — surface as 502, keep API alive
         logger.exception("Query embedding failed")
         logger.exception("embedding generation failed")
         return _response(502, {"error": "embedding_failed", "detail": "internal_error"})

@@ -84,13 +84,13 @@ def hashed_embedding(text: str, dims: int = DEFAULT_DIMS) -> list[float]:
         dims: Vector width (16..2048).
 
     Returns:
-        List of ``dims`` floats (unit length when text is non-empty).
+        List of ``dims`` floats (unit length when text is non-empty;
+        all-zero vector for empty/whitespace-only input).
     """
     vec = [0.0] * dims
     tokens = _tokens(text)
     if not tokens:
-        vec[0] = 1.0  # stable unit vector for empty inputs
-        return vec
+        return vec  # zero vector for empty inputs — never a fake unit vector
 
     counts: dict[tuple[str, str], int] = {}
     for tok in tokens:

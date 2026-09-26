@@ -21,7 +21,7 @@ Environment variables (set by Terraform):
   SSM_API_KEY_PARAM   SSM parameter holding the Ollama API key (SecureString)
   SSM_MODEL_PARAM     SSM parameter holding the Ollama model name
   MAX_SUMMARIZE       Number of top articles to AI-summarize (default 10)
-  ARTICLE_TTL_DAYS    DynamoDB TTL for seen-article entries (default 90)
+  ARTICLE_TTL_DAYS    DynamoDB TTL for seen-article entries (default 14)
   REPORTS_PREFIX      S3 prefix for PDF reports (default "reports")
   ARCHIVE_PREFIX      S3 prefix for digest JSON archives (default "archive")
 """
@@ -34,7 +34,7 @@ import re
 import time
 import urllib.error
 import urllib.request
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -52,6 +52,7 @@ from embeddings import (
     pack_base64,
     unpack_base64,
 )
+from source_authority import DEFAULT_AUTHORITY, SOURCE_AUTHORITY
 
 try:
     import bleach
@@ -99,42 +100,6 @@ DEFAULT_FETCH_CONFIG = {
 
 DEFAULT_INTERESTS = ["AI agents", "cloud architecture", "security", "DevOps", "machine learning"]
 
-# ─── Source authority (ported from dedup.py) ────────────────────────────────
-
-SOURCE_AUTHORITY = {
-    "OpenAI News": 1.0,
-    "Google AI Blog": 1.0,
-    "MIT Technology Review AI": 0.95,
-    "Hugging Face Blog": 0.9,
-    "arXiv cs.AI": 0.85,
-    "VentureBeat AI": 0.8,
-    "The Verge AI": 0.75,
-    "Ahead of AI (Raschka)": 0.9,
-    "The Gradient": 0.85,
-    "Simon Willison's Blog": 0.85,
-    "NVIDIA Technical Blog": 0.8,
-    "Apple ML Research": 0.8,
-    "Last Week in AI": 0.7,
-    "KDnuggets": 0.7,
-    "Distill": 0.85,
-    "Roboflow Blog": 0.65,
-    "LangChain Blog": 0.7,
-    "MarkTechPost": 0.6,
-    "HEISE AI (Germany)": 0.6,
-    "The Decoder (Germany)": 0.65,
-    "Silicon UK AI": 0.6,
-    "France 24 AI": 0.5,
-    "AI Business (UK)": 0.6,
-    "InfoQ AI/ML/Data": 0.7,
-    "Pandaily (China Tech)": 0.5,
-    "Synced (China AI)": 0.6,
-    "SCMP Tech": 0.6,
-    "Japan Times Tech": 0.5,
-    "Analytics India Mag": 0.5,
-    "AI China": 0.4,
-}
-DEFAULT_AUTHORITY = 0.5
-
 # Allowed HTML tags for description sanitization (kept small and safe)
 _ALLOWED_TAGS = ["p", "br", "a", "ul", "ol", "li", "b", "strong", "i", "em"]
 _ALLOWED_ATTRIBUTES = {"a": ["href", "title"]}
@@ -180,6 +145,28 @@ def ssm_get(name: str, default: str = "") -> str:
     except Exception as e:
         logger.warning("SSM parameter %s unavailable: %s", name, e)
         return default
+
+
+_SSM_CACHE: dict[str, str] = {}
+
+
+def ssm_get_cached(name: str, default: str = "") -> str:
+    """Read an SSM parameter via ``ssm_get`` with a warm-start cache.
+
+    Parameter values are stable between deploys, so warm invocations reuse the
+    cached value and skip the API round-trip. The cache lives at module level
+    and is reset automatically when a fresh container starts.
+
+    Args:
+        name: Parameter name (SecureString values are decrypted).
+        default: Value to return when the parameter is missing.
+
+    Returns:
+        Parameter value or the default.
+    """
+    if name not in _SSM_CACHE:
+        _SSM_CACHE[name] = ssm_get(name, default)
+    return _SSM_CACHE[name]
 
 
 # ─── Helpers (ported from news-gatherer.py) ──────────────────────────────────
@@ -342,11 +329,11 @@ def matches_filters(article: dict[str, Any], filters: dict[str, Any]) -> bool:
         if kw.lower() in text:
             return False
 
-    for kw in filters.get("include_keywords", []):
-        if kw.lower() in text:
-            return True
+    include_keywords = filters.get("include_keywords", [])
+    if not include_keywords:
+        return True  # empty include list = no include filter (pass-through)
 
-    return False
+    return any(kw.lower() in text for kw in include_keywords)
 
 
 # ─── DynamoDB dedup ──────────────────────────────────────────────────────────
@@ -390,8 +377,9 @@ def get_seen_hashes(fingerprints: list[str]) -> set[str]:
 def record_articles(articles: list[dict[str, Any]], today: str) -> int:
     """Persist article fingerprints to DynamoDB with a TTL.
 
-    Uses per-item ``PutItem`` — BatchWriteItem avoided for least privilege.
-    Entries expire after ARTICLE_TTL_DAYS so the dedup table self-cleans.
+    Articles are always recorded, including those later filtered out — they
+    must not resurface on subsequent runs. Entries expire after
+    ARTICLE_TTL_DAYS so the dedup table self-cleans.
 
     Args:
         articles: Articles to record (all fetched, not just filtered).
@@ -421,6 +409,9 @@ def record_articles(articles: list[dict[str, Any]], today: str) -> int:
 def clean_summary(raw: str) -> str:
     """Clean model output to extract just the summary.
 
+    Removes ``<thinking>`` blocks, meta-sentences, ANSI escapes and any
+    leftover HTML tags, then keeps the last few sentences.
+
     Args:
         raw: Raw text output from the summarization model.
 
@@ -430,6 +421,7 @@ def clean_summary(raw: str) -> str:
     raw = re.sub(r"<thinking>.*?</thinking>", "", raw, flags=re.DOTALL)
     raw = re.sub(r"^Thinking\.\.\..*$", "", raw, flags=re.MULTILINE)
     raw = re.sub(r"^We need to.*?\n", "", raw, flags=re.MULTILINE)
+    raw = re.sub(r"<[^>]+>", "", raw)  # strip remaining HTML tags
     raw = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", raw)
     raw = raw.strip()
 
@@ -498,8 +490,8 @@ def summarize_top(articles: list[dict[str, Any]]) -> tuple[int, bool]:
     if not articles:
         return 0, False
 
-    model = ssm_client.get_parameter(Name=SSM_MODEL_PARAM)["Parameter"]["Value"]
-    api_key = ssm_client.get_parameter(Name=SSM_API_KEY_PARAM, WithDecryption=True)["Parameter"]["Value"]
+    model = ssm_get_cached(SSM_MODEL_PARAM)
+    api_key = ssm_get_cached(SSM_API_KEY_PARAM)
 
     placeholder = not api_key or api_key == "PLACEHOLDER_SET_BY_MASTER"
     if placeholder:
@@ -710,7 +702,6 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
     Returns:
         Pipeline statistics dict.
     """
-    started = datetime.now(timezone.utc)
     logger.info("News pipeline (AWS) starting — force=%s", force)
 
     # Step 1: Load config from S3
@@ -783,7 +774,6 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
     seen_in_batch: set[str] = set()
     unique_articles = []
     for a in all_articles:
-        dedup_key = a["fingerprint"]
         if a["url"] in seen_in_batch or a["fingerprint"] in seen_in_batch:
             continue
         seen_in_batch.add(a["url"])
@@ -805,9 +795,8 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Record everything fetched as seen (also filtered-out items — they must
-    # not resurface later). Only when not forced, so test runs stay repeatable
-    # with respect to later daily runs is NOT desired: force runs DO record.
+    # Record everything fetched as seen — always, including force runs (the
+    # dedup lookup is what force skips; storage still happens either way).
     if unique_articles:
         recorded = record_articles(new_articles, today)
         logger.info("Recorded %s article hashes in DynamoDB", recorded)
@@ -933,11 +922,11 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     force = bool(event.get("force") or event.get("rerun"))
 
     if event.get("test_ai"):
-        model = ssm_client.get_parameter(Name=SSM_MODEL_PARAM)["Parameter"]["Value"]
-        api_key = ssm_client.get_parameter(Name=SSM_API_KEY_PARAM, WithDecryption=True)["Parameter"]["Value"]
-        import requests as _requests
+        model = ssm_get_cached(SSM_MODEL_PARAM)
+        api_key = ssm_get_cached(SSM_API_KEY_PARAM)
+        resp = None  # set before the try block so the status report is safe
         try:
-            resp = _requests.post(
+            resp = requests.post(
                 OLLAMA_ENDPOINT,
                 json={"model": model, "messages": [{"role": "user", "content": "Say OK"}], "stream": False},
                 headers={"Authorization": f"Bearer {api_key}"},
@@ -949,7 +938,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         return {
             "statusCode": 200,
             "body": json.dumps({"endpoint": OLLAMA_ENDPOINT, "model": model,
-                                "status": getattr(resp, "status_code", None),
+                                "status": resp.status_code if resp is not None else None,
                                 "body": body_snippet}),
         }
 

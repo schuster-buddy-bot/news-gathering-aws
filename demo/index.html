@@ -786,7 +786,10 @@
     function escapeHtml(str) {
       const div = document.createElement("div");
       div.textContent = String(str ?? "");
-      return div.innerHTML;
+      // innerHTML trick escapes & < > but not quotes — escape those too
+      return div.innerHTML
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
     }
 
     let toastTimer = null;

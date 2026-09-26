@@ -15,7 +15,6 @@ Environment variables (set by Terraform):
 import json
 import logging
 import os
-from datetime import datetime, timezone
 
 import boto3
 from botocore.config import Config
@@ -76,7 +75,7 @@ def _health() -> dict:
             "version": VERSION,
             "region": s3.meta.region_name,
         })
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         logger.exception("Health check failed")
         logger.exception("health check failed")
         return _response(500, {"status": "error", "detail": "internal_error"})
@@ -118,7 +117,7 @@ def _latest_report() -> dict:
                               ProjectionExpression="s3_key, article_count, generated_at, #d",
                               ExpressionAttributeNames={"#d": "date"})
             items.extend(resp.get("Items", []))
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         logger.exception("DynamoDB scan failed")
         logger.exception("DynamoDB unavailable")
         return _response(500, {"error": "dynamodb_unavailable", "detail": "internal_error"})
@@ -137,7 +136,7 @@ def _latest_report() -> dict:
             Params={"Bucket": BUCKET, "Key": s3_key},
             ExpiresIn=PRESIGN_TTL,
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         logger.exception("Presigned URL generation failed")
         logger.exception("presign failed")
         return _response(500, {"error": "presign_failed", "detail": "internal_error"})
