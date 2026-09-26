@@ -81,7 +81,9 @@ data "aws_iam_policy_document" "pipeline" {
       "ssm:GetParameters",
     ]
     resources = [
-      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/*",
+      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/ollama-api-key",
+      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/ollama-model",
+      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/embedding-model",
     ]
   }
 }
@@ -226,7 +228,7 @@ data "aws_iam_policy_document" "search" {
     resources = [aws_dynamodb_table.articles.arn]
   }
 
-  # SSM: embedding model/provider selector
+  # SSM: embedding model only (search does NOT need api-key or ollama-model)
   statement {
     sid    = "SSMParameters"
     effect = "Allow"
@@ -235,7 +237,7 @@ data "aws_iam_policy_document" "search" {
       "ssm:GetParameters",
     ]
     resources = [
-      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/*",
+      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/embedding-model",
     ]
   }
 }

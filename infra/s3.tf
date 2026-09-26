@@ -40,14 +40,34 @@ resource "aws_s3_bucket_versioning" "reports" {
 resource "aws_s3_bucket_lifecycle_configuration" "reports" {
   bucket = aws_s3_bucket.reports.id
 
+  # Reports: expire after retention period (14 days default)
   rule {
     id     = "expire-old-reports"
     status = "Enabled"
 
-    filter {}
+    filter {
+      prefix = "reports/"
+    }
 
     expiration {
       days = var.report_retention_days
     }
   }
+
+  # Article archive: expire after retention period
+  rule {
+    id     = "expire-old-archive"
+    status = "Enabled"
+
+    filter {
+      prefix = "archive/"
+    }
+
+    expiration {
+      days = var.report_retention_days
+    }
+  }
+
+  # Config: never expire (sources.json, filters.json, interests.json)
+  # No rule = no expiration — config/ persists indefinitely
 }

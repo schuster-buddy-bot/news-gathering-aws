@@ -128,7 +128,8 @@ def lambda_handler(event: dict, context) -> dict:
         query_vec = embed_text(q, model)
     except Exception as e:  # noqa: BLE001 — surface as 502, keep API alive
         logger.exception("Query embedding failed")
-        return _response(502, {"error": "embedding_failed", "detail": str(e)})
+        logger.exception("embedding generation failed")
+        return _response(502, {"error": "embedding_failed", "detail": "internal_error"})
 
     items = _load_corpus()
     scored: list[tuple[float, dict]] = []

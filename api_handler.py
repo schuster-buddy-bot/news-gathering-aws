@@ -78,7 +78,8 @@ def _health() -> dict:
         })
     except Exception as e:  # noqa: BLE001
         logger.exception("Health check failed")
-        return _response(500, {"status": "error", "detail": str(e)})
+        logger.exception("health check failed")
+        return _response(500, {"status": "error", "detail": "internal_error"})
 
 
 def _info() -> dict:
@@ -119,7 +120,8 @@ def _latest_report() -> dict:
             items.extend(resp.get("Items", []))
     except Exception as e:  # noqa: BLE001
         logger.exception("DynamoDB scan failed")
-        return _response(500, {"error": "dynamodb_unavailable", "detail": str(e)})
+        logger.exception("DynamoDB unavailable")
+        return _response(500, {"error": "dynamodb_unavailable", "detail": "internal_error"})
 
     if not items:
         return _response(404, {"error": "no_reports_yet"})
@@ -137,7 +139,8 @@ def _latest_report() -> dict:
         )
     except Exception as e:  # noqa: BLE001
         logger.exception("Presigned URL generation failed")
-        return _response(500, {"error": "presign_failed", "detail": str(e)})
+        logger.exception("presign failed")
+        return _response(500, {"error": "presign_failed", "detail": "internal_error"})
 
     return _response(200, {
         "date": latest["date"],
