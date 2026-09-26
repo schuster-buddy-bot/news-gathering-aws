@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>News Intelligence Pipeline — Demo</title>
+  <style>
+    /* === Design Tokens === */
+    :root {
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+      --space-4: 1rem; --space-5: 1.5rem; --space-6: 2rem; --space-8: 4rem;
+      --text-xs: 0.75rem; --text-sm: 0.875rem; --text-base: 1rem;
+      --text-lg: 1.25rem; --text-xl: 1.563rem; --text-2xl: 1.953rem;
+      --color-surface: #f8fafc; --color-surface-raised: #ffffff;
+      --color-structure: #e2e8f0; --color-structure-strong: #cbd5e1;
+      --color-ink: #0f172a; --color-ink-muted: #475569; --color-ink-faint: #94a3b8;
+      --color-accent: #3b82f6; --color-accent-hover: #2563eb; --color-accent-soft: #dbeafe;
+      --color-success: #16a34a; --color-warning: #d97706; --color-danger: #dc2626;
+      --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-full: 9999px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05); --shadow-md: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+      --transition-fast: 150ms ease; --transition-normal: 200ms ease;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-surface: #121212; --color-surface-raised: #1e1e1e;
+        --color-structure: #2d2d2d; --color-structure-strong: #404040;
+        --color-ink: #e8eaed; --color-ink-muted: #94a3b8; --color-ink-faint: #6b7280;
+        --color-accent: #60a5fa; --color-accent-hover: #93c5fd; --color-accent-soft: #1e3a5f;
+        --color-success: #4ade80; --color-warning: #fbbf24; --color-danger: #f87171;
+        --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      font-size: var(--text-base); line-height: 1.5;
+      background: var(--color-surface); color: var(--color-ink);
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--color-accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* === Layout === */
+    .container { max-width: 1200px; margin-inline: auto; padding-inline: clamp(1rem, 4vw, 3rem); }
+    .page { display: grid; grid-template-rows: auto 1fr auto; min-height: 100dvh; }
+
+    /* Navbar */
+    .navbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: var(--space-3) clamp(1rem, 4vw, 3rem);
+      background: var(--color-surface-raised);
+      border-bottom: 1px solid var(--color-structure);
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+    .navbar-brand { font-size: var(--text-lg); font-weight: 700; color: var(--color-ink); }
+    .navbar-brand:hover { text-decoration: none; }
+    .navbar-links { display: flex; gap: var(--space-4); align-items: center; }
+    .navbar-links a { font-size: var(--text-sm); font-weight: 500; color: var(--color-ink-muted); }
+    .navbar-links a:hover { color: var(--color-ink); }
+    .health-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--color-ink-faint); transition: background var(--transition-fast);
+    }
+    .health-dot.ok { background: var(--color-success); }
+    .health-dot.error { background: var(--color-danger); }
+
+    /* Hero */
+    .hero { padding: var(--space-8) 0; text-align: center; }
+    .hero h1 { font-size: var(--text-2xl); font-weight: 700; margin-bottom: var(--space-3); }
+    .hero p { font-size: var(--text-lg); color: var(--color-ink-muted); max-width: 600px; margin-inline: auto; }
+
+    /* Search Section */
+    .search-section { padding: var(--space-6) 0; }
+    .search-bar {
+      display: flex; gap: var(--space-2); max-width: 600px; margin-inline: auto;
+    }
+    .search-bar input {
+      flex: 1; padding: var(--space-3) var(--space-4);
+      font-size: var(--text-base);
+      border: 1px solid var(--color-structure); border-radius: var(--radius-md);
+      background: var(--color-surface-raised); color: var(--color-ink);
+      min-height: 44px;
+    }
+    .search-bar input:focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: var(--space-2) var(--space-4); font-size: var(--text-sm); font-weight: 500;
+      border: 1px solid transparent; border-radius: var(--radius-md);
+      cursor: pointer; min-height: 44px; transition: all var(--transition-fast);
+    }
+    .btn-primary { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+    .btn-primary:hover { background: var(--color-accent-hover); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* API Key Bar */
+    .api-key-bar {
+      display: flex; align-items: center; gap: var(--space-2);
+      max-width: 600px; margin: var(--space-3) auto 0;
+      font-size: var(--text-sm); color: var(--color-ink-muted);
+    }
+    .api-key-bar input {
+      flex: 1; padding: var(--space-2) var(--space-3);
+      font-size: var(--text-sm);
+      border: 1px solid var(--color-structure); border-radius: var(--radius-sm);
+      background: var(--color-surface-raised); color: var(--color-ink);
+      font-family: monospace;
+    }
+
+    /* Results */
+    .results { padding: var(--space-4) 0 var(--space-8); }
+    .result-meta { text-align: center; color: var(--color-ink-muted); font-size: var(--text-sm); margin-bottom: var(--space-5); }
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+      gap: var(--space-4);
+    }
+    .result-card {
+      background: var(--color-surface-raised);
+      border: 1px solid var(--color-structure);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow var(--transition-normal), transform var(--transition-normal);
+    }
+    .result-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .result-card h3 { font-size: var(--text-base); margin-bottom: var(--space-2); }
+    .result-card h3 a { color: var(--color-ink); }
+    .result-card h3 a:hover { color: var(--color-accent); }
+    .result-card p { font-size: var(--text-sm); color: var(--color-ink-muted); margin-bottom: var(--space-3); }
+    .result-card .meta {
+      display: flex; gap: var(--space-2); align-items: center;
+      font-size: var(--text-xs); color: var(--color-ink-faint);
+    }
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 0.125rem 0.5rem; font-size: var(--text-xs); font-weight: 500;
+      border-radius: var(--radius-full); background: var(--color-accent-soft); color: var(--color-accent);
+    }
+    .score-bar {
+      height: 4px; background: var(--color-structure); border-radius: var(--radius-full);
+      margin-top: var(--space-2); overflow: hidden;
+    }
+    .score-bar-fill { height: 100%; background: var(--color-accent); border-radius: var(--radius-full); }
+
+    /* Latest Report */
+    .report-section {
+      padding: var(--space-6) 0; text-align: center;
+      border-top: 1px solid var(--color-structure); margin-top: var(--space-6);
+    }
+    .report-section h2 { font-size: var(--text-xl); margin-bottom: var(--space-3); }
+    .report-section p { color: var(--color-ink-muted); margin-bottom: var(--space-4); }
+    .report-info { display: flex; gap: var(--space-5); justify-content: center; margin-bottom: var(--space-4); flex-wrap: wrap; }
+    .report-info div { font-size: var(--text-sm); }
+    .report-info strong { display: block; font-size: var(--text-lg); color: var(--color-ink); }
+
+    /* Footer */
+    .footer {
+      padding: var(--space-6) clamp(1rem, 4vw, 3rem);
+      border-top: 1px solid var(--color-structure);
+      color: var(--color-ink-muted); font-size: var(--text-sm); text-align: center;
+    }
+    .footer a { color: var(--color-ink-muted); }
+
+    /* Loading */
+    .loading { text-align: center; padding: var(--space-8); color: var(--color-ink-muted); }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid var(--color-structure);
+      border-top-color: var(--color-accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto var(--space-3);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: var(--space-5); left: 50%; transform: translateX(-50%);
+      background: var(--color-ink); color: var(--color-surface);
+      padding: var(--space-2) var(--space-4); border-radius: var(--radius-md);
+      font-size: var(--text-sm); z-index: 400; opacity: 0; transition: opacity var(--transition-normal);
+    }
+    .toast.show { opacity: 1; }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .navbar-links a:not(.health-link) { display: none; }
+      .hero h1 { font-size: var(--text-xl); }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main" class="skip-link" style="position:absolute;left:-9999px;">Skip to content</a>
+
+  <div class="page">
+    <!-- Navbar -->
+    <nav class="navbar">
+      <a href="/" class="navbar-brand">📰 News Intelligence</a>
+      <div class="navbar-links">
+        <a href="#search">Search</a>
+        <a href="#report">Latest Report</a>
+        <a href="https://github.com/schuster-buddy-bot/news-gathering-aws" target="_blank">GitHub</a>
+        <span class="health-dot" id="health-dot"></span>
+        <a href="#" class="health-link" id="health-link" style="font-size:var(--text-xs);">Checking...</a>
+      </div>
+    </nav>
+
+    <!-- Main -->
+    <main id="main">
+      <!-- Hero -->
+      <section class="hero">
+        <div class="container">
+          <h1>AI-Powered News Intelligence Pipeline</h1>
+          <p>Semantic search across 125+ daily articles from 44 sources — powered by AWS Lambda, DynamoDB &amp; embeddings.</p>
+        </div>
+      </section>
+
+      <!-- Search -->
+      <section class="search-section" id="search">
+        <div class="container">
+          <div class="search-bar">
+            <input type="search" id="search-input" placeholder="Search articles... (e.g. AI agents, cloud architecture)" aria-label="Search articles">
+            <button class="btn btn-primary" id="search-btn" onclick="doSearch()">Search</button>
+          </div>
+          <div class="api-key-bar">
+            <label for="api-key-input">API Key:</label>
+            <input type="password" id="api-key-input" placeholder="Enter API key..." value="">
+            <button class="btn" style="padding:var(--space-1) var(--space-3);font-size:var(--text-xs);min-height:auto;" onclick="saveApiKey()">Save</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Results -->
+      <section class="results">
+        <div class="container">
+          <div id="results-container"></div>
+        </div>
+      </section>
+
+      <!-- Latest Report -->
+      <section class="report-section" id="report">
+        <div class="container">
+          <h2>Latest Daily Report</h2>
+          <p>Download the full PDF report with AI summaries and top picks.</p>
+          <div class="report-info" id="report-info">
+            <div><strong id="report-date">—</strong>Date</div>
+            <div><strong id="report-articles">—</strong>Articles</div>
+          </div>
+          <button class="btn btn-primary" id="download-btn" onclick="downloadReport()" disabled>Download PDF</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Built with AWS Lambda · DynamoDB · S3 · API Gateway · Terraform · <a href="https://github.com/schuster-buddy-bot/news-gathering-aws" target="_blank">Source Code</a></p>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API_BASE = "https://r4w0f48k64.execute-api.eu-central-1.amazonaws.com/v1";
+    let apiKey = localStorage.getItem("news-api-key") || "";
+    let latestReportUrl = null;
+
+    // Init
+    document.getElementById("api-key-input").value = apiKey;
+    document.getElementById("search-input").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") doSearch();
+    });
+
+    // Health check
+    async function checkHealth() {
+      const dot = document.getElementById("health-dot");
+      const link = document.getElementById("health-link");
+      try {
+        const resp = await fetch(`${API_BASE}/health`);
+        const data = await resp.json();
+        if (data.status === "ok") {
+          dot.classList.add("ok");
+          link.textContent = "Online";
+        } else {
+          dot.classList.add("error");
+          link.textContent = "Degraded";
+        }
+      } catch (e) {
+        dot.classList.add("error");
+        link.textContent = "Offline";
+      }
+    }
+
+    // Save API key
+    function saveApiKey() {
+      apiKey = document.getElementById("api-key-input").value.trim();
+      localStorage.setItem("news-api-key", apiKey);
+      showToast("API key saved");
+      loadReport();
+    }
+
+    // Search
+    async function doSearch() {
+      const query = document.getElementById("search-input").value.trim();
+      if (!query) return;
+      if (!apiKey) { showToast("Please enter your API key first"); return; }
+
+      const container = document.getElementById("results-container");
+      container.innerHTML = '<div class="loading"><div class="spinner"></div>Searching...</div>';
+
+      try {
+        const resp = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}&limit=10`, {
+          headers: { "x-api-key": apiKey }
+        });
+        if (resp.status === 403) {
+          container.innerHTML = '<div class="loading">❌ Invalid API key. Please check your key.</div>';
+          return;
+        }
+        const data = await resp.json();
+        const results = data.results || data;
+        renderResults(results, query, data.model || "?", data.corpus_size || "?");
+      } catch (e) {
+        container.innerHTML = '<div class="loading">❌ Search failed. Please try again.</div>';
+      }
+    }
+
+    function renderResults(results, query, model, corpus) {
+      const container = document.getElementById("results-container");
+      if (!results.length) {
+        container.innerHTML = `<div class="result-meta">No results for "${query}"</div>`;
+        return;
+      }
+      container.innerHTML = `
+        <div class="result-meta">
+          ${results.length} results for "${query}" · ${corpus} articles indexed · model: ${model}
+        </div>
+        <div class="result-grid">
+          ${results.map(r => {
+            const score = (r.similarity_score || 0).toFixed(3);
+            const scorePct = Math.min(100, (r.similarity_score || 0) * 100);
+            const cat = r.category || "general";
+            return `
+              <article class="result-card">
+                <h3><a href="${r.url}" target="_blank" rel="noopener">${escapeHtml(r.title || "Untitled")}</a></h3>
+                <p>${escapeHtml(r.summary || r.snippet || "")}</p>
+                <div class="meta">
+                  <span class="badge">${escapeHtml(cat)}</span>
+                  <span>${r.date || ""}</span>
+                  <span>score: ${score}</span>
+                </div>
+                <div class="score-bar"><div class="score-bar-fill" style="width:${scorePct}%"></div></div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    // Latest report
+    async function loadReport() {
+      if (!apiKey) return;
+      try {
+        const resp = await fetch(`${API_BASE}/report/latest`, {
+          headers: { "x-api-key": apiKey }
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        document.getElementById("report-date").textContent = data.date || "—";
+        document.getElementById("report-articles").textContent = data.article_count || data.articles || "—";
+        if (data.url) {
+          latestReportUrl = data.url;
+          document.getElementById("download-btn").disabled = false;
+        }
+      } catch (e) { /* silent fail */ }
+    }
+
+    function downloadReport() {
+      if (latestReportUrl) window.open(latestReportUrl, "_blank");
+    }
+
+    // Helpers
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2000);
+    }
+
+    // Init
+    checkHealth();
+    if (apiKey) loadReport();
+    setInterval(checkHealth, 60000);
+  </script>
+</body>
+</html>
