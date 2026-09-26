@@ -44,6 +44,6 @@ resource "aws_s3_bucket_website_configuration" "demo_site" {
 }
 
 output "demo_url" {
-  value       = "http://${aws_s3_bucket.demo_site.bucket}.s3-website-${data.aws_region.current.name}.amazonaws.com"
-  description = "Demo UI URL"
+  value       = "http://${aws_s3_bucket.demo_site.bucket}.s3-website.${data.aws_region.current.name}.amazonaws.com"
+  description = "Demo UI URL (eu-central-1 uses the dot-form website endpoint)"
 }
