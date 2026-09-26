@@ -62,6 +62,7 @@ data "aws_iam_policy_document" "pipeline" {
       "dynamodb:PutItem",
       "dynamodb:Query",
       "dynamodb:Scan",
+      "dynamodb:UpdateItem",
       "dynamodb:DescribeTable",
       "dynamodb:DescribeTimeToLive",
     ]

@@ -13,9 +13,17 @@ resource "aws_ssm_parameter" "ollama_api_key" {
   }
 }
 
-# Non-secret: model name is managed by Terraform.
+# Non-secret: model names are managed by Terraform.
 resource "aws_ssm_parameter" "ollama_model" {
   name  = "/${var.project}/ollama-model"
   type  = "String"
   value = var.ollama_model
+}
+
+# Embedding model/provider selector. "local-hashed[-N]" = stdlib feature
+# hashing (no network); any other value = Ollama /api/embed model name.
+resource "aws_ssm_parameter" "embedding_model" {
+  name  = "/${var.project}/embedding-model"
+  type  = "String"
+  value = var.embedding_model
 }

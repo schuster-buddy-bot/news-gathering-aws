@@ -33,6 +33,8 @@ resource "aws_lambda_function" "pipeline" {
       OLLAMA_ENDPOINT  = "https://ollama.com/api/chat"
       SSM_API_KEY_PARAM = aws_ssm_parameter.ollama_api_key.name
       SSM_MODEL_PARAM  = aws_ssm_parameter.ollama_model.name
+      SSM_EMBEDDING_MODEL_PARAM = aws_ssm_parameter.embedding_model.name
+      EMBEDDING_ENABLED = "true"
       MAX_SUMMARIZE    = tostring(var.max_summarize)
       ARTICLE_TTL_DAYS = tostring(var.article_ttl_days)
       REPORTS_TTL_DAYS = tostring(var.report_ttl_days)

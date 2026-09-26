@@ -16,6 +16,12 @@ variable "ollama_model" {
   default     = "deepseek-v4.1-flash"
 }
 
+variable "embedding_model" {
+  description = "Embedding provider: 'local-hashed[-N]' (stdlib hashing) or an Ollama model for /api/embed."
+  type        = string
+  default     = "local-hashed-256"
+}
+
 variable "article_ttl_days" {
   description = "DynamoDB TTL for dedup (seen-article) entries."
   type        = number

@@ -41,6 +41,8 @@ from typing import Any
 import boto3
 import requests
 
+from embeddings import embed_text, pack_base64
+
 try:
     import bleach
 except ImportError:  # pragma: no cover - bleach ships in the deploy ZIP
@@ -68,6 +70,10 @@ SSM_MODEL_PARAM = os.environ.get("SSM_MODEL_PARAM", "/news-pipeline/ollama-model
 MAX_SUMMARIZE = int(os.environ.get("MAX_SUMMARIZE", "10"))
 ARTICLE_TTL_DAYS = int(os.environ.get("ARTICLE_TTL_DAYS", "14"))
 REPORTS_TTL_DAYS = int(os.environ.get("REPORTS_TTL_DAYS", "30"))
+SSM_EMBEDDING_MODEL_PARAM = os.environ.get(
+    "SSM_EMBEDDING_MODEL_PARAM", "/news-pipeline/embedding-model"
+)
+EMBEDDING_ENABLED = os.environ.get("EMBEDDING_ENABLED", "true").lower() == "true"
 
 ARTICLES_TABLE = ddb_resource.Table(ARTICLES_TABLE_NAME)
 REPORTS_TABLE = ddb_resource.Table(REPORTS_TABLE_NAME)
@@ -516,6 +522,68 @@ def summarize_top(articles: list[dict[str, Any]]) -> tuple[int, bool]:
     return ai_success, True
 
 
+# ─── Embeddings (semantic search storage) ─────────────────────────────────
+
+def generate_embeddings(articles: list[dict[str, Any]]) -> tuple[int, str]:
+    """Generate + Base64-pack embeddings for articles (in-place).
+
+    Uses the model from SSM (/news-pipeline/embedding-model). Articles that
+    fail are kept without an embedding (search skips them) — never fatal.
+
+    Args:
+        articles: Filtered article list; ``embedding``/``embedding_model``
+            keys are added on success.
+
+    Returns:
+        Tuple of (embedding_count, model_name).
+    """
+    model = ssm_get(SSM_EMBEDDING_MODEL_PARAM, "local-hashed-256")
+    count = 0
+    for a in articles:
+        text = f"{a['title']} {a.get('summary') or a.get('description', '')}"[:2000]
+        try:
+            vec = embed_text(text, model)
+            a["embedding"] = pack_base64(vec)
+            a["embedding_model"] = model
+            count += 1
+        except Exception as e:  # noqa: BLE001 — embedding must not break the pipeline
+            logger.warning("Embedding failed for '%s': %s", a["title"][:50], e)
+    return count, model
+
+
+def store_article_embeddings(articles: list[dict[str, Any]]) -> int:
+    """Write embedding blobs to the articles table (search corpus).
+
+    The rows already exist (record_articles marks them seen); this update
+    adds ``embedding``, ``embedding_model`` and the cleaned summary.
+
+    Args:
+        articles: Articles with an ``embedding`` attribute set.
+
+    Returns:
+        Number of items updated.
+    """
+    count = 0
+    for a in articles:
+        if not a.get("embedding"):
+            continue
+        try:
+            ARTICLES_TABLE.update_item(
+                Key={"url_hash": a["fingerprint"]},
+                UpdateExpression="SET #e = :e, #m = :m, #s = :s",
+                ExpressionAttributeNames={"#e": "embedding", "#m": "embedding_model", "#s": "summary"},
+                ExpressionAttributeValues={
+                    ":e": a["embedding"],
+                    ":m": a.get("embedding_model", ""),
+                    ":s": a.get("summary", "")[:300],
+                },
+            )
+            count += 1
+        except Exception as e:  # noqa: BLE001 — storage is per-article, never fatal
+            logger.warning("Embedding store failed for '%s': %s", a["title"][:50], e)
+    return count
+
+
 # ─── Pipeline ────────────────────────────────────────────────────────────────
 
 def run_pipeline(force: bool = False) -> dict[str, Any]:
@@ -637,6 +705,16 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
     # Step 6: AI summarization (top articles; fallback for the rest)
     ai_count, ai_enabled = summarize_top(filtered)
 
+    # Step 6.5: Embeddings for the semantic-search corpus (DynamoDB)
+    embedding_count = 0
+    if EMBEDDING_ENABLED and filtered:
+        embedding_count, embedding_model = generate_embeddings(filtered)
+        stored = store_article_embeddings(filtered)
+        logger.info(
+            "Embeddings: %s/%s generated (%s), %s stored",
+            embedding_count, len(filtered), embedding_model, stored,
+        )
+
     # Step 7: Categorize
     by_category: dict[str, list[dict[str, Any]]] = {
         "major": [], "niche": [], "european": [], "asian": [],
@@ -702,6 +780,7 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
         "curated": len(filtered),
         "ai_summaries": ai_count,
         "ai_enabled": ai_enabled,
+        "embeddings": embedding_count,
         "failed_sources": failed_sources,
         "source_warning_count": len(source_warnings),
         "pdf_key": pdf_key,
@@ -748,6 +827,20 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 "status": getattr(resp, "status_code", None),
                                 "body": body_snippet}),
         }
+
+    if event.get("test_embed"):
+        model = ssm_get(SSM_EMBEDDING_MODEL_PARAM, "local-hashed-256")
+        try:
+            vec = embed_text("AI agents are transforming cloud architecture", model)
+            blob = pack_base64(vec)
+            return {
+                "statusCode": 200,
+                "body": json.dumps({"model": model, "dims": len(vec),
+                                    "b64_chars": len(blob),
+                                    "b64_prefix": blob[:40]}),
+            }
+        except Exception as e:  # noqa: BLE001 — surfaced for debugging
+            return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
     try:
         stats = run_pipeline(force=force)
