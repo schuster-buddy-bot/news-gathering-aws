@@ -1,0 +1,23 @@
+# Local build artifacts
+build/
+__pycache__/
+*.pyc
+
+# Terraform
+infra/.terraform/
+infra/.terraform.lock.hcl.bak
+infra/*.tfstate
+infra/*.tfstate.*
+infra/*.tfvars
+infra/tfplan
+infra/crash.log
+
+# OS
+.DS_Store
+
+# Secrets — NEVER commit
+.env
+.env.*
+*.pem
+*.key
+secrets.json
