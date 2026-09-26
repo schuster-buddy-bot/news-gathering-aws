@@ -1,0 +1,49 @@
+name: "🏃 Sprint Task"
+description: "Structured task for sprint execution (Coding Team)"
+labels: ["team:sprint"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description"
+      description: "What needs to be done?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Akzeptanzkriterien (DoD)"
+      description: "Checklist — all items must be done before PR"
+      value: |
+        - [ ] Code implemented
+        - [ ] Tests written (if applicable)
+        - [ ] No regression — existing functionality still works
+        - [ ] Code on feature branch, no push to main
+        - [ ] PR created with description
+    validations:
+      required: true
+
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: "Test-Plan"
+      description: "How to verify this works"
+    validations:
+      required: true
+
+  - type: textarea
+    id: limitations
+    attributes:
+      label: "Limitations / Constraints"
+      description: "What NOT to do, scope boundaries"
+    validations:
+      required: false
+
+  - type: input
+    id: pattern-source
+    attributes:
+      label: "Pattern Source"
+      description: "Which book/pattern drove this task? (for traceability)"
+    validations:
+      required: false
