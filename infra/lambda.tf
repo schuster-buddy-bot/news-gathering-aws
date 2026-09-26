@@ -69,6 +69,30 @@ resource "aws_lambda_function" "api" {
   depends_on = [aws_iam_role_policy.api_logs]
 }
 
+# ─── Search function (GET /search?q=...) ──────────────────────────────
+# Shares the API deployment ZIP (api_handler.py + search_handler.py + embeddings.py).
+
+resource "aws_lambda_function" "search" {
+  function_name    = "${var.project}-search"
+  role             = aws_iam_role.search.arn
+  handler          = "search_handler.lambda_handler"
+  runtime          = "python3.12"
+  timeout          = 30
+  memory_size      = 256
+  filename         = data.archive_file.api.output_path
+  source_code_hash = data.archive_file.api.output_base64sha256
+
+  environment {
+    variables = {
+      ARTICLES_TABLE            = aws_dynamodb_table.articles.name
+      SSM_EMBEDDING_MODEL_PARAM = aws_ssm_parameter.embedding_model.name
+      LOG_LEVEL                 = "INFO"
+    }
+  }
+
+  depends_on = [aws_iam_role_policy.search_logs]
+}
+
 # ─── Log groups (explicit retention, created before first invoke) ────────────
 
 resource "aws_cloudwatch_log_group" "pipeline" {
@@ -78,5 +102,10 @@ resource "aws_cloudwatch_log_group" "pipeline" {
 
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/aws/lambda/${aws_lambda_function.api.function_name}"
+  retention_in_days = 14
+}
+
+resource "aws_cloudwatch_log_group" "search" {
+  name              = "/aws/lambda/${aws_lambda_function.search.function_name}"
   retention_in_days = 14
 }

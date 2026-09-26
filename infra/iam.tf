@@ -182,3 +182,81 @@ resource "aws_iam_role_policy" "api_logs" {
     ]
   })
 }
+# ─── Search role (GET /search) ──────────────────────────────────────────────
+
+resource "aws_iam_role" "search" {
+  name = "${var.project}-search-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+data "aws_iam_policy_document" "search" {
+  statement {
+    sid    = "Logs"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = [
+      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project}-search",
+      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project}-search:*",
+    ]
+  }
+
+  # DynamoDB: scan the embedding corpus
+  statement {
+    sid    = "DynamoDBScan"
+    effect = "Allow"
+    actions = [
+      "dynamodb:Scan",
+      "dynamodb:DescribeTable",
+    ]
+    resources = [aws_dynamodb_table.articles.arn]
+  }
+
+  # SSM: embedding model/provider selector
+  statement {
+    sid    = "SSMParameters"
+    effect = "Allow"
+    actions = [
+      "ssm:GetParameter",
+      "ssm:GetParameters",
+    ]
+    resources = [
+      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "search" {
+  name   = "${var.project}-search-policy"
+  role   = aws_iam_role.search.id
+  policy = data.aws_iam_policy_document.search.json
+}
+
+resource "aws_iam_role_policy" "search_logs" {
+  name   = "${var.project}-search-logs-create"
+  role   = aws_iam_role.search.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "logs:CreateLogGroup"
+        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project}-search"
+      }
+    ]
+  })
+}
