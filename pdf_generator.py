@@ -12,6 +12,7 @@ Layout (port of the Telegram digest format):
 """
 
 from io import BytesIO
+import re
 from xml.sax.saxutils import escape as xml_escape
 
 from reportlab.lib import colors
@@ -106,6 +107,23 @@ def importance_score(article: dict) -> float:
     return authority * 0.8 + substance
 
 
+def _clean_for_pdf(text: str) -> str:
+    """Strip HTML tags and collapse whitespace for clean PDF rendering.
+
+    Source descriptions and AI summaries may intentionally carry inline HTML
+    (the Telegram digest renders it); for the PDF we want plain text.
+
+    Args:
+        text: Raw text possibly containing HTML tags.
+
+    Returns:
+        Plain text with tags removed and whitespace collapsed.
+    """
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
 def _article_block(article: dict, show_summary: bool = True) -> list:
     """Build the flowable block for one article.
 
@@ -117,16 +135,16 @@ def _article_block(article: dict, show_summary: bool = True) -> list:
         List of flowables for this article.
     """
     block = [
-        Paragraph(xml_escape(article["title"]), STYLE_ARTICLE_TITLE),
+        Paragraph(xml_escape(_clean_for_pdf(article["title"])), STYLE_ARTICLE_TITLE),
         Paragraph(
-            xml_escape(article.get("source", "unknown"))
+            xml_escape(_clean_for_pdf(article.get("source", "unknown")))
             + " · " + xml_escape(CATEGORY_LABELS.get(article.get("category", ""), article.get("category", ""))),
             STYLE_META,
         ),
     ]
     if show_summary and article.get("summary"):
         block.append(Spacer(1, 1))
-        block.append(Paragraph(xml_escape(article["summary"]), STYLE_SUMMARY))
+        block.append(Paragraph(xml_escape(_clean_for_pdf(article["summary"])), STYLE_SUMMARY))
     block.append(
         Paragraph(f'<a href="{xml_escape(article["url"], {chr(34): "&quot;"})}" color="#1155cc">'
                   f'{xml_escape(article["url"][:100])}</a>', STYLE_LINK)
