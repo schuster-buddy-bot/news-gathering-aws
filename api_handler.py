@@ -91,8 +91,9 @@ def _info() -> dict:
         "service": "news-pipeline-api",
         "version": VERSION,
         "endpoints": {
-            "GET /health": "Service health check",
-            "GET /report/latest": "Latest daily report (metadata + presigned PDF URL)",
+            "GET /health": "Service health check (public)",
+            "GET /search?q=&limit=": "Semantic search (x-api-key required)",
+            "GET /report/latest": "Latest daily report (x-api-key required)",
         },
     })
 
