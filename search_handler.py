@@ -9,6 +9,10 @@ returns the top matches as JSON with CORS headers.
 Environment variables (set by Terraform):
   ARTICLES_TABLE            DynamoDB articles table (PK: url_hash)
   SSM_EMBEDDING_MODEL_PARAM SSM parameter with the embedding model/provider
+
+The semantic-search core lives in ``search_articles()`` (public) so the
+read-only demo handler (demo_handler.py) can reuse it without duplicating
+scoring logic (BFF/CQRS pattern: same engine, private vs public facade).
 """
 
 import json
@@ -21,6 +25,10 @@ from embeddings import FALLBACK_MODEL, cosine_similarity, embed_text, unpack_bas
 
 logger = logging.getLogger()
 logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+
+
+class EmbeddingError(Exception):
+    """Raised when the query embedding provider fails (maps to HTTP 502)."""
 
 ARTICLES_TABLE_NAME = os.environ["ARTICLES_TABLE"]
 SSM_EMBEDDING_MODEL_PARAM = os.environ.get(
@@ -52,7 +60,7 @@ def _response(status_code: int, payload: dict) -> dict:
     }
 
 
-def _get_model() -> str:
+def get_embedding_model() -> str:
     """Read the embedding model name from SSM (fallback: local provider)."""
     try:
         resp = ssm_client.get_parameter(Name=SSM_EMBEDDING_MODEL_PARAM)
@@ -62,12 +70,16 @@ def _get_model() -> str:
         return FALLBACK_MODEL
 
 
-def _load_corpus() -> list[dict]:
+# Backwards-compatible private alias (existing callers/tests).
+_get_model = get_embedding_model
+
+
+def load_corpus() -> list[dict]:
     """Scan all articles with an embedding (paginated).
 
     Returns:
         List of article items (url_hash, title, url, category, first_seen,
-        source, summary, embedding).
+        source, summary, embedding, embedding_model).
     """
     kwargs = {
         "FilterExpression": "attribute_exists(#e)",
@@ -94,6 +106,10 @@ def _load_corpus() -> list[dict]:
     return items
 
 
+# Backwards-compatible private alias (existing callers/tests).
+_load_corpus = load_corpus
+
+
 def lambda_handler(event: dict, context) -> dict:
     """AWS Lambda entry point for the /search API Gateway route.
 
@@ -104,8 +120,34 @@ def lambda_handler(event: dict, context) -> dict:
 
     Returns:
         Proxy response: {query, model, corpus_size, count, results: [...]}
-        where each result carries title, url, category, date, source,
-        summary and similarity_score (cosine, 0..1).
+    Returns:
+        Proxy response: {query, model, corpus_size, count, results: [...]} where
+        each result carries title, url, category, date, source, summary and
+        similarity_score (cosine, 0..1).
+    """
+    q, top_k = parse_search_params(event)
+    logger.info("Search request: q=%r limit=%s", q[:80], top_k)
+    if not q:
+        return _response(400, {
+            "error": "missing_query",
+            "detail": "Provide a search query: /search?q=<terms>",
+        })
+
+    try:
+        payload = search_articles(q, top_k)
+    except EmbeddingError:
+        return _response(502, {"error": "embedding_failed", "detail": "internal_error"})
+    return _response(200, payload)
+
+
+def parse_search_params(event: dict) -> tuple[str, int]:
+    """Extract + validate ``q`` and ``limit`` from an API Gateway proxy event.
+
+    Args:
+        event: API Gateway proxy event (single or multi-value query strings).
+
+    Returns:
+        Tuple of (stripped query string, clamped top_k).
     """
     params = event.get("queryStringParameters") or {}
     multi = event.get("multiValueQueryStringParameters") or {}
@@ -115,24 +157,34 @@ def lambda_handler(event: dict, context) -> dict:
         top_k = min(max(int(limit_raw), 1), MAX_TOP_K) if limit_raw else DEFAULT_TOP_K
     except ValueError:
         top_k = DEFAULT_TOP_K
+    return q.strip(), top_k
 
-    q = q.strip()
-    logger.info("Search request: q=%r limit=%s", q[:80], top_k)
-    if not q:
-        return _response(400, {
-            "error": "missing_query",
-            "detail": "Provide a search query: /search?q=<terms>",
-        })
 
-    model = _get_model()
+def search_articles(query: str, top_k: int) -> dict:
+    """Core semantic search — shared by private /search and public /demo/search.
+
+    Embeds the query, scans the corpus, filters to vectors from the same
+    embedding space and ranks by cosine similarity.
+
+    Args:
+        query: Non-empty, already-stripped search terms.
+        top_k: Maximum number of results to return.
+
+    Returns:
+        Payload dict (not a proxy response): {query, model, corpus_size,
+        comparable_size, count, results: [...]}.
+
+    Raises:
+        EmbeddingError: Query embedding provider failed.
+    """
+    model = get_embedding_model()
     try:
-        query_vec = embed_text(q, model)
-    except Exception:  # noqa: BLE001 — surface as 502, keep API alive
+        query_vec = embed_text(query, model)
+    except Exception as e:  # noqa: BLE001 — surface as 502, keep API alive
         logger.exception("Query embedding failed")
-        logger.exception("embedding generation failed")
-        return _response(502, {"error": "embedding_failed", "detail": "internal_error"})
+        raise EmbeddingError("embedding generation failed") from e
 
-    items = _load_corpus()
+    items = load_corpus()
     scored: list[tuple[float, dict]] = []
     comparable_count = 0
     for item in items:
@@ -165,11 +217,11 @@ def lambda_handler(event: dict, context) -> dict:
         for score, item in top
     ]
 
-    return _response(200, {
-        "query": q,
+    return {
+        "query": query,
         "model": model,
         "corpus_size": len(items),
         "comparable_size": comparable_count,
         "count": len(results),
         "results": results,
-    })
+    }

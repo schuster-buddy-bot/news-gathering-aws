@@ -16,7 +16,7 @@ rm -rf build
 mkdir -p build/pipeline build/api
 
 cp lambda_handler.py pdf_generator.py embeddings.py source_authority.py build/pipeline/
-cp api_handler.py search_handler.py embeddings.py source_authority.py build/api/
+cp api_handler.py search_handler.py demo_handler.py embeddings.py source_authority.py build/api/
 
 # API Lambda needs a recent boto3/botocore — the Lambda runtime's built-in
 # version (~1.34) has a presigned-URL bug that truncates the SigV4 service
