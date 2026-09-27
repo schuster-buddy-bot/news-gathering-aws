@@ -13,6 +13,10 @@ Built entirely within the AWS free tier (target: ~$0/month).
 
 📋 **Architecture diagram:** [docs/architecture.html](docs/architecture.html) (open in browser)
 
+🌐 **Live public demo (no API key needed):**
+[http://000911984950-news-pipeline-demo.s3-website.eu-central-1.amazonaws.com](http://000911984950-news-pipeline-demo.s3-website.eu-central-1.amazonaws.com)
+— semantic search, multi-topic explorer (with CSV upload) and category browsing over the live corpus. Read-only, rate-limited (5 req/s burst 10), CQRS-safe: the demo Lambda's IAM role grants **zero write permissions**.
+
 ## Features
 
 - **44 RSS/Atom sources** fetched in parallel (AI/ML/tech from US, EU, Asia)
@@ -25,6 +29,8 @@ Built entirely within the AWS free tier (target: ~$0/month).
   PDF "Top Picks" ordered by relevance
 - **Daily PDF report** (reportlab, in-process) + digest JSON archive
 - **Secured API** — API key auth + usage-plan throttling (~100 req/min), secrets in SSM
+- **Public demo UI** — tabbed interface (Search / Topic Explorer / Browse) on S3,
+  no API key needed: read-only demo Lambda (CQRS read side), rate-limited
 - **Infrastructure as Code** — the full stack in Terraform
 
 ## Architecture
@@ -46,11 +52,21 @@ Built entirely within the AWS free tier (target: ~$0/month).
                 │        ├─ PDF        reportlab → S3 reports/ (TTL 14d) │
                 │        └─ digest     S3 archive/ + DynamoDB (TTL 30d)  │
                 │                                                        │
-                │     API Gateway REST (stage v1, API-key auth)          │
+                │     API Gateway REST (stage v1)                        │
  HTTPS ─────────┼──► GET /            Lambda news-pipeline-api  (public) │
                 │    GET /health      Lambda news-pipeline-api  (public) │
                 │    GET /search      Lambda news-pipeline-search 🔑     │
                 │    GET /report/latest  Lambda news-pipeline-api 🔑     │
+                │                                                        │
+                │     Public demo (CQRS read side, NO API key,           │
+                │     throttled 5 rps / burst 10, read-only IAM)         │
+ HTTPS ─────────┼──► GET /demo/search         Lambda news-pipeline-demo  │
+                │    GET /demo/report/latest                              │
+                │    GET /demo/topics · POST /demo/search-by-topics       │
+                │    GET /demo/browse · GET /demo/articles                │
+                │                                                        │
+                │     S3 Website (demo UI, tabbed SPA):                  │
+                │    http://…news-pipeline-demo.s3-website…              │
                 │                                                        │
                 │    SSM Parameter Store: ollama-api-key, ollama-model,  │
                 │    embedding-model, api-key   (SecureString/String)    │
@@ -78,9 +94,17 @@ Base URL: `https://r4w0f48k64.execute-api.eu-central-1.amazonaws.com/v1`
 | `GET /health` | public | Health check (DynamoDB + S3 connectivity) |
 | `GET /search?q=<terms>&limit=<1-50>` | `x-api-key` | Semantic search over the last ~14 days of articles |
 | `GET /report/latest` | `x-api-key` | Latest daily report metadata + presigned PDF URL (1 h) |
+| `GET /demo/search?q=&limit=` | none | Public demo semantic search (same engine, throttle-limited) |
+| `GET /demo/report/latest` | none | Latest report + presigned PDF URL (public demo) |
+| `GET /demo/topics` | none | Predefined demo topics + category labels |
+| `POST /demo/search-by-topics` | none | Multi-topic search, top-K per topic (max 10 topics) |
+| `GET /demo/browse` | none | Article counts per category |
+| `GET /demo/articles?category=&limit=` | none | Recent articles for one category |
 
-**Rate limiting:** usage plan — burst 100, sustained 2 req/s (≈100 req/min per key).
+**Rate limiting:** private routes — usage plan, burst 100, sustained 2 req/s per key.
 Requests without (or with a wrong) key get `403`.
+Public `/demo/*` routes need no key: throttle target 5 req/s / burst 10, and
+Lambda-concurrency overruns are answered with a retryable `429` (`rate_limited`).
 
 ### Examples
 
