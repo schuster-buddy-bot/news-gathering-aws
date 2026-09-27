@@ -35,6 +35,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
       - name: Build Lambda deployment packages
         run: bash build.sh
 
@@ -72,8 +79,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
-          API_ID=$(cd infra && terraform output -raw api_base_url | sed 's|.*/\([a-z0-9]*\)/v1|\1|')
-          echo "API Gateway ID: $API_ID"
+          API_URL=$(cd infra && terraform output -raw api_base_url)
+          API_ID=$(echo "$API_URL" | grep -oP '(?<=https://)[a-z0-9]+(?=\.)')
+          echo "API Gateway ID: $API_ID (from $API_URL)"
           aws apigateway create-deployment \
             --rest-api-id "$API_ID" \
             --stage-name v1 \
