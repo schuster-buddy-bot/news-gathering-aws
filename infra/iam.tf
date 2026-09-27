@@ -89,9 +89,9 @@ data "aws_iam_policy_document" "pipeline" {
 
   # Bedrock: Titan Text Embeddings V2 for article + interest-profile vectors
   statement {
-    sid    = "BedrockInvoke"
-    effect = "Allow"
-    actions = ["bedrock:InvokeModel"]
+    sid       = "BedrockInvoke"
+    effect    = "Allow"
+    actions   = ["bedrock:InvokeModel"]
     resources = ["arn:aws:bedrock:${data.aws_region.current.name}::foundation-model/amazon.titan-embed-text-v2:0"]
   }
 }
@@ -103,8 +103,8 @@ resource "aws_iam_role_policy" "pipeline" {
 }
 
 resource "aws_iam_role_policy" "pipeline_logs" {
-  name   = "${var.project}-pipeline-logs-create"
-  role   = aws_iam_role.pipeline.id
+  name = "${var.project}-pipeline-logs-create"
+  role = aws_iam_role.pipeline.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -179,8 +179,8 @@ resource "aws_iam_role_policy" "api" {
 }
 
 resource "aws_iam_role_policy" "api_logs" {
-  name   = "${var.project}-api-logs-create"
-  role   = aws_iam_role.api.id
+  name = "${var.project}-api-logs-create"
+  role = aws_iam_role.api.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -251,9 +251,9 @@ data "aws_iam_policy_document" "search" {
 
   # Bedrock: Titan Text Embeddings V2 for the query vector
   statement {
-    sid    = "BedrockInvoke"
-    effect = "Allow"
-    actions = ["bedrock:InvokeModel"]
+    sid       = "BedrockInvoke"
+    effect    = "Allow"
+    actions   = ["bedrock:InvokeModel"]
     resources = ["arn:aws:bedrock:${data.aws_region.current.name}::foundation-model/amazon.titan-embed-text-v2:0"]
   }
 }
@@ -265,8 +265,8 @@ resource "aws_iam_role_policy" "search" {
 }
 
 resource "aws_iam_role_policy" "search_logs" {
-  name   = "${var.project}-search-logs-create"
-  role   = aws_iam_role.search.id
+  name = "${var.project}-search-logs-create"
+  role = aws_iam_role.search.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [

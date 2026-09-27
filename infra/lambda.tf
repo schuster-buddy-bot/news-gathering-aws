@@ -27,18 +27,18 @@ resource "aws_lambda_function" "pipeline" {
 
   environment {
     variables = {
-      CONFIG_BUCKET    = aws_s3_bucket.reports.bucket
-      ARTICLES_TABLE   = aws_dynamodb_table.articles.name
-      REPORTS_TABLE    = aws_dynamodb_table.reports.name
-      OLLAMA_ENDPOINT  = "https://ollama.com/api/chat"
-      SSM_API_KEY_PARAM = aws_ssm_parameter.ollama_api_key.name
-      SSM_MODEL_PARAM  = aws_ssm_parameter.ollama_model.name
+      CONFIG_BUCKET             = aws_s3_bucket.reports.bucket
+      ARTICLES_TABLE            = aws_dynamodb_table.articles.name
+      REPORTS_TABLE             = aws_dynamodb_table.reports.name
+      OLLAMA_ENDPOINT           = "https://ollama.com/api/chat"
+      SSM_API_KEY_PARAM         = aws_ssm_parameter.ollama_api_key.name
+      SSM_MODEL_PARAM           = aws_ssm_parameter.ollama_model.name
       SSM_EMBEDDING_MODEL_PARAM = aws_ssm_parameter.embedding_model.name
-      EMBEDDING_ENABLED = "true"
-      MAX_SUMMARIZE    = tostring(var.max_summarize)
-      ARTICLE_TTL_DAYS = tostring(var.article_ttl_days)
-      REPORTS_TTL_DAYS = tostring(var.report_ttl_days)
-      LOG_LEVEL        = "INFO"
+      EMBEDDING_ENABLED         = "true"
+      MAX_SUMMARIZE             = tostring(var.max_summarize)
+      ARTICLE_TTL_DAYS          = tostring(var.article_ttl_days)
+      REPORTS_TTL_DAYS          = tostring(var.report_ttl_days)
+      LOG_LEVEL                 = "INFO"
     }
   }
 

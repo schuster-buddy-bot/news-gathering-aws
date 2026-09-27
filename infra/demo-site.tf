@@ -15,8 +15,8 @@ resource "aws_s3_bucket_public_access_block" "demo_site" {
 # Note: public access block must be created before policy
 data "aws_iam_policy_document" "demo_public_read" {
   statement {
-    sid       = "PublicReadGetObject"
-    effect    = "Allow"
+    sid    = "PublicReadGetObject"
+    effect = "Allow"
     principals {
       type        = "*"
       identifiers = ["*"]
