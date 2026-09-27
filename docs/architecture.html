@@ -55,7 +55,7 @@
   .badge { font-size: 10px; font-weight: 700; fill: var(--accent); }
 </style>
 <main>
-<svg viewBox="0 0 1080 620" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 1080 685" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L0,6 L9,3 z" fill="#64748b" />
@@ -133,6 +133,7 @@
   <rect x="240" y="405" width="140" height="60" rx="8" class="node input" />
   <text x="310" y="430" text-anchor="middle" class="label">API Gateway</text>
   <text x="310" y="448" text-anchor="middle" class="small">REST · v1 · API key</text>
+  <text x="310" y="462" text-anchor="middle" class="small">/demo/* public · 5 rps</text>
 
   <!-- Lambda API -->
   <rect x="440" y="405" width="130" height="60" rx="8" class="node process" />
@@ -144,17 +145,22 @@
   <text x="695" y="430" text-anchor="middle" class="label">Lambda Search</text>
   <text x="695" y="448" text-anchor="middle" class="small">/search (cosine sim)</text>
 
+  <!-- Lambda Demo (public, read-only) -->
+  <rect x="630" y="475" width="130" height="60" rx="8" class="node process" />
+  <text x="695" y="497" text-anchor="middle" class="label">Lambda Demo</text>
+  <text x="695" y="513" text-anchor="middle" class="small">/demo/* read-only</text>
+
   <!-- Client -->
   <rect x="850" y="405" width="130" height="60" rx="8" class="node external" />
   <text x="915" y="430" text-anchor="middle" class="label">Client</text>
   <text x="915" y="448" text-anchor="middle" class="small">curl · browser</text>
 
   <!-- Row 3: CI/CD -->
-  <line x1="30" y1="495" x2="1050" y2="495" stroke="#64748b" stroke-width="0.5" opacity="0.3" />
-  <text x="50" y="517" class="small">CI/CD</text>
+  <line x1="30" y1="560" x2="1050" y2="560" stroke="#64748b" stroke-width="0.5" opacity="0.3" />
+  <text x="50" y="582" class="small">CI/CD</text>
 
-  <rect x="50" y="525" width="970" height="12" rx="6" fill="#4338ca" opacity="0.15" />
-  <text x="540" y="535" text-anchor="middle" class="badge">GitHub Actions: CI (ruff + pytest + terraform fmt/validate) → Security (Checkov) → Deploy (build + terraform apply + API Gateway) → Weekly: Drift Detection</text>
+  <rect x="50" y="590" width="970" height="12" rx="6" fill="#4338ca" opacity="0.15" />
+  <text x="540" y="600" text-anchor="middle" class="badge">GitHub Actions: CI (ruff + pytest + terraform fmt/validate) → Security (Checkov) → Deploy (build + terraform apply + API Gateway) → Weekly: Drift Detection</text>
 
   <!-- Edges: Sources → Lambda -->
   <path d="M180 135 L240 135" class="edge" marker-end="url(#arrow)" />
@@ -178,6 +184,8 @@
   <path d="M695 405 L695 370 L540 370 L540 180" class="edge" marker-end="url(#arrow)" />
   <!-- Lambda API → S3 (presigned) -->
   <path d="M505 405 L505 370 L740 370 L740 180" class="edge" marker-end="url(#arrow)" />
+  <!-- API GW → Lambda Demo -->
+  <path d="M380 450 L630 500" class="edge" marker-end="url(#arrow)" />
   <!-- Client → API GW -->
   <path d="M850 435 L380 435" class="edge-accent" marker-end="url(#arrow-accent)" />
 </svg>
