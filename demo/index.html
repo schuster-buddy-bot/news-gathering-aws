@@ -765,6 +765,31 @@
     .modal-summary { font-size: 0.95rem; color: var(--ink-soft); margin: var(--space-3) 0 var(--space-4); }
     .modal-link { text-decoration: none; border: none; }
 
+    /* ── How it works ── */
+    .howitworks { margin: var(--space-6) 0 var(--space-5); }
+    .howitworks-row { display: flex; align-items: center; justify-content: center; gap: var(--space-3); flex-wrap: wrap; }
+    .how-step { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--glass-border); background: var(--glass); cursor: help; transition: all var(--fast); }
+    .how-step:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-card); }
+    .how-icon { font-size: 1.5rem; flex: none; }
+    .how-label { font-size: 0.82rem; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
+    .how-desc { font-size: 0.72rem; color: var(--ink-faint); line-height: 1.3; }
+    .how-arrow { color: var(--ink-faint); font-size: 1.2rem; opacity: 0.5; }
+    @media (max-width: 640px) { .how-arrow { display: none; } .how-step { flex: 1 1 calc(50% - 1rem); } }
+
+    /* ── Info boxes ── */
+    .info-box { display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); border-radius: var(--radius-md); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); background: var(--accent-soft); font-size: 0.85rem; color: var(--ink-soft); line-height: 1.5; }
+    .info-icon { flex: none; }
+
+    /* ── CSV example (collapsible) ── */
+    .csv-example { margin-top: var(--space-3); font-size: 0.82rem; }
+    .csv-example summary { cursor: pointer; color: var(--ink-muted); font-weight: 600; padding: var(--space-1) 0; }
+    .csv-example summary:hover { color: var(--accent); }
+    .csv-code { font-family: var(--font-mono); font-size: 0.76rem; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--bg-soft); border: 1px solid var(--glass-border); color: var(--ink-soft); margin: var(--space-2) 0; white-space: pre; overflow-x: auto; }
+    .csv-note { font-size: 0.78rem; color: var(--ink-faint); }
+
+    /* ── Results score tip ── */
+    .results-tip { font-size: 0.78rem; color: var(--ink-faint); margin-top: var(--space-1); padding: var(--space-1) var(--space-3); border-radius: var(--radius-sm); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent); }
+
     /* ════════════════════════════════════════════════════════════════════════
        Responsive
        ════════════════════════════════════════════════════════════════════════ */
@@ -849,12 +874,12 @@
             <span class="search-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             </span>
-            <input type="search" id="search-input" placeholder="Ask anything… e.g. “AI agents”, “chip export controls”" aria-label="Search articles" autocomplete="off">
+            <input type="search" id="search-input" placeholder="Ask anything… e.g. “AI agents”, “chip export controls”" aria-label="Search articles" autocomplete="off" title="Semantic search — type any phrase, the AI finds articles by meaning not keywords. Press Enter or click Search.">
             <button class="btn-search" id="search-btn" onclick="doSearch()">
               Search <span class="kbd-hint">↵</span>
             </button>
           </div>
-          <p class="no-key-note" title="Public demo — read-only, no key needed"><span class="live-dot"></span>Public demo — no API key needed, read-only, rate-limited</p>
+          <p class="no-key-note" title="This is a public read-only demo. The backend pipeline (fetching, summarizing, embedding) runs on a schedule — the demo only reads existing data."><span class="live-dot"></span>Public demo — no API key needed, read-only, rate-limited</p>
         </div>
         <div class="chips" aria-label="Try these searches">
           <button class="chip" onclick="quickSearch('AI agents')">AI agents</button>
@@ -866,23 +891,51 @@
       </section>
     </div>
 
+    <!-- ═══════════ How it works ═══════════ -->
+    <section class="container howitworks" aria-label="How it works">
+      <div class="howitworks-row">
+        <div class="how-step" title="44 RSS feeds from major outlets, EU institutions, UN, and niche tech blogs — fetched every day at 05:00 UTC">
+          <span class="how-icon">📡</span>
+          <div><div class="how-label">Fetch</div><div class="how-desc">44 RSS sources<br>daily at 05:00 UTC</div></div>
+        </div>
+        <span class="how-arrow">→</span>
+        <div class="how-step" title="Cross-run deduplication by URL hash, then keyword filtering. AI summaries via Ollama for top articles.">
+          <span class="how-icon">🧹</span>
+          <div><div class="how-label">Process</div><div class="how-desc">Dedup · filter<br>AI summaries</div></div>
+        </div>
+        <span class="how-arrow">→</span>
+        <div class="how-step" title="Each article embedded as 256-dim vector using Ollama nomic-embed-text. Search uses cosine similarity, not keyword matching.">
+          <span class="how-icon">🔎</span>
+          <div><div class="how-label">Embed</div><div class="how-desc">256-dim vectors<br>cosine similarity</div></div>
+        </div>
+        <span class="how-arrow">→</span>
+        <div class="how-step" title="Daily PDF report with Table of Contents, Top Picks with AI summaries, and all articles grouped by category.">
+          <span class="how-icon">📄</span>
+          <div><div class="how-label">Report</div><div class="how-desc">PDF with TOC<br>+ Top Picks</div></div>
+        </div>
+      </div>
+    </section>
+
     <!-- ═══════════ Tab bar ═══════════ -->
     <section class="container" aria-label="Explore">
       <nav class="tabbar" role="tablist" aria-label="Explore tabs">
-        <button class="tab active" id="tab-search" role="tab" aria-selected="true" aria-controls="panel-search" onclick="switchTab('search')">
+        <button class="tab active" id="tab-search" role="tab" aria-selected="true" aria-controls="panel-search" onclick="switchTab('search')" title="Search all articles by semantic similarity — type any phrase, results ranked by AI embedding relevance">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           Search
         </button>
-        <button class="tab" id="tab-topics" role="tab" aria-selected="false" aria-controls="panel-topics" onclick="switchTab('topics')">
+        <button class="tab" id="tab-topics" role="tab" aria-selected="false" aria-controls="panel-topics" onclick="switchTab('topics')" title="Track multiple topics at once — type them or upload a CSV. We embed each topic and find the best-matching articles.">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><circle cx="7" cy="7" r="1.2"/></svg>
           Topic Explorer
         </button>
-        <button class="tab" id="tab-browse" role="tab" aria-selected="false" aria-controls="panel-browse" onclick="switchTab('browse')">
+        <button class="tab" id="tab-browse" role="tab" aria-selected="false" aria-controls="panel-browse" onclick="switchTab('browse')" title="Browse all articles grouped by source category: UN, EU Parliament, Bundestag, Major AI News, Niche Research, European, Asian">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
           Browse
         </button>
       </nav>
     </section>
+
+    <!-- ═══════════ Search tab panel: Stats + Results + Report ═══════════ -->
+    <section class="tab-panel active" id="panel-search" data-panel="search" role="tabpanel" aria-label="Search results">
 
     <!-- ═══════════ Stats bar ═══════════ -->
     <section class="container" aria-label="Pipeline statistics">
@@ -911,7 +964,7 @@
     </section>
 
     <!-- ═══════════ Results (Search tab) ═══════════ -->
-    <section class="results-section container tab-panel active" id="panel-search" data-panel="search" role="tabpanel" aria-label="Search results">
+    <section class="results-section container">
       <div id="results-container">
         <div class="empty-state">
           <div class="big">🛰️</div>
@@ -922,13 +975,13 @@
     </section>
 
     <!-- ═══════════ Latest report (Search tab) ═══════════ -->
-    <section class="report-section container tab-panel" id="report" data-panel="search">
+    <section class="report-section container" id="report">
       <div class="report-card">
         <div class="report-title">
           <span class="report-glyph" aria-hidden="true">📄</span>
           <div>
             <h2>Daily Intelligence Report</h2>
-            <span class="report-sub">AI summaries, top picks &amp; full article digest as PDF</span>
+            <span class="report-sub">AI summaries, top picks &amp; full article digest as PDF — <abbr title="Table of Contents with bookmark links, Top Picks with full AI summaries, 7 category sections with colored headers, zebra-striped lists, page numbers">what's inside?</abbr></span>
           </div>
         </div>
         <div class="report-metrics">
@@ -941,6 +994,7 @@
         </button>
       </div>
     </section>
+    </section>
 
     <!-- ═══════════ Topic Explorer (topics tab) ═══════════ -->
     <section class="container tab-panel" id="panel-topics" data-panel="topics" role="tabpanel" aria-label="Topic explorer">
@@ -950,6 +1004,11 @@
             <h2>Topic Explorer</h2>
             <span class="topics-sub">Watch multiple topics at once — up to 10, top 5 matches each</span>
           </div>
+        </div>
+
+        <div class="info-box" title="Each topic you add is embedded as a vector. We compare it against all articles in the corpus using cosine similarity and return the top 5 matches per topic.">
+          <span class="info-icon">💡</span>
+          <span><strong>How this works:</strong> Add topics you care about (or upload a CSV). We embed each topic and find the best-matching articles from today's corpus — up to 5 per topic.</span>
         </div>
 
         <div class="topic-editor">
@@ -962,6 +1021,16 @@
               <input type="file" id="csv-file" accept=".csv,.txt,.tsv" hidden onchange="handleCsv(this.files)">
             </label>
           </div>
+          <details class="csv-example">
+            <summary>CSV format example</summary>
+            <pre class="csv-code">topic
+EU AI Act
+quantum computing
+cloud security
+semiconductor supply chain
+open source models</pre>
+            <p class="csv-note">One topic per line. Header row optional — we auto-detect a "topic", "keyword", or "name" column. Comma, semicolon, and tab separated all work.</p>
+          </details>
           <div class="topic-chips" id="topic-chips" aria-live="polite"></div>
           <div class="topics-foot">
             <div class="suggested" id="suggested-topics" aria-label="Suggested topics"></div>
@@ -987,6 +1056,10 @@
     <!-- ═══════════ Browse (browse tab) ═══════════ -->
     <section class="container tab-panel" id="panel-browse" data-panel="browse" role="tabpanel" aria-label="Browse by category">
       <div class="browse-view" id="browse-grid-view">
+        <div class="info-box" title="Articles are grouped by their RSS source category. The pipeline tracks 7 categories covering international institutions, major AI news, and regional perspectives.">
+          <span class="info-icon">💡</span>
+          <span><strong>7 categories:</strong> United Nations, EU Parliament, Deutscher Bundestag, Major AI News, Niche &amp; Research, European Perspective, Asian Perspective.</span>
+        </div>
         <div class="browse-head">
           <h2>Browse by Category</h2>
           <span class="browse-sub" id="browse-total">—</span>
@@ -1275,6 +1348,7 @@
           <div class="results-meta">
             ${results.length} results · corpus ${fmtInt(corpus || lastCorpusSize || 0)} · <span class="mono">${escapeHtml(model)}</span> · ${distinctSources} source${distinctSources === 1 ? "" : "s"} in top ${results.length}
           </div>
+          <div class="results-tip">💡 Score = cosine similarity (0–100%). Higher = more relevant. <strong>Not</strong> keyword matching — the AI understands meaning.</div>
         </div>
         <div class="result-grid">
           ${results.map((r, i) => {
