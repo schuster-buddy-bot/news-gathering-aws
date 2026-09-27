@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="AI-powered news intelligence pipeline — semantic search across daily articles, powered by AWS serverless.">
+  <meta name="description" content="AI-powered news intelligence pipeline — semantic search, topic explorer and live browsing across daily articles, powered by AWS serverless.">
   <meta name="theme-color" content="#0b1026">
   <title>News Intelligence Pipeline — Semantic Search on AWS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -306,14 +306,6 @@
       padding: 0 var(--space-2);
     }
     .key-row label { font-size: 0.8rem; font-weight: 600; color: var(--ink-muted); white-space: nowrap; }
-    #api-key-input {
-      flex: 1; min-width: 0;
-      padding: 9px 12px; font-family: var(--font-mono); font-size: 0.82rem;
-      color: var(--ink); background: var(--glass);
-      border: 1px solid var(--glass-border); border-radius: 10px; outline: none;
-      transition: border-color var(--fast);
-    }
-    #api-key-input:focus { border-color: var(--accent); }
     .key-save {
       padding: 9px 14px; font-size: 0.8rem; font-weight: 700;
       border: 1px solid var(--glass-border); border-radius: 10px;
@@ -558,6 +550,221 @@
     .toast.show { opacity: 1; transform: translate(-50%, 0); }
     .toast::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
 
+    /* ======================================================================
+       v2 - Tab bar, panels, Topic Explorer, Browse, modal
+       ====================================================================== */
+    .tabbar {
+      display: flex; gap: var(--space-2); justify-content: center; flex-wrap: wrap;
+      margin: calc(-1 * var(--space-5)) auto var(--space-6);
+      position: relative; z-index: 6;
+    }
+    .tab {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 22px; border-radius: var(--radius-full);
+      border: 1px solid var(--glass-border-strong); background: var(--glass-strong);
+      backdrop-filter: blur(14px);
+      color: var(--ink-soft); font: inherit; font-size: 0.92rem; font-weight: 700;
+      cursor: pointer; transition: all var(--fast);
+      box-shadow: var(--shadow-card);
+    }
+    .tab svg { width: 16px; height: 16px; opacity: 0.75; }
+    .tab:hover { color: var(--ink); transform: translateY(-1px); border-color: var(--glass-border-strong); }
+    .tab.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: var(--on-accent); border-color: transparent;
+      box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--accent) 75%, transparent);
+    }
+    .tab.active svg { opacity: 1; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: rise-in 480ms var(--ease) both; }
+
+    .no-key-note {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-top: var(--space-3); font-size: 0.78rem; font-weight: 600;
+      color: var(--ink-muted); cursor: default;
+    }
+    .no-key-note .live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--success);
+      box-shadow: 0 0 8px rgba(52, 211, 153, 0.8); flex: none;
+    }
+
+    /* Topic Explorer */
+    .topics-card {
+      background: var(--glass);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border-strong);
+      border-radius: var(--radius-lg);
+      padding: clamp(1.25rem, 3vw, 2rem);
+      box-shadow: var(--shadow-card);
+    }
+    .topics-head h2 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+    .topics-sub { font-size: 0.85rem; color: var(--ink-muted); }
+    .topic-editor {
+      margin-top: var(--space-4);
+      padding: var(--space-4);
+      border: 1px dashed var(--glass-border-strong);
+      border-radius: var(--radius-md);
+      background: var(--bg-soft);
+    }
+    .topic-input-row { display: flex; gap: var(--space-2); }
+    #topic-input {
+      flex: 1; min-width: 0;
+      padding: 11px 14px; font: inherit; font-size: 0.95rem; color: var(--ink);
+      background: var(--glass-strong); border: 1px solid var(--glass-border);
+      border-radius: 12px; outline: none; transition: border-color var(--fast);
+    }
+    #topic-input:focus { border-color: var(--accent); }
+    .btn-topic-add {
+      padding: 0 18px; font: inherit; font-size: 0.9rem; font-weight: 700;
+      color: var(--on-accent); border: none; border-radius: 12px; cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      transition: all var(--fast); white-space: nowrap;
+    }
+    .btn-topic-add:hover { filter: brightness(1.08); transform: translateY(-1px); }
+    .csv-btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 16px; border-radius: 12px;
+      border: 1px solid var(--glass-border); background: var(--glass-strong);
+      color: var(--ink-soft); font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; transition: all var(--fast); white-space: nowrap;
+    }
+    .csv-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .csv-btn svg { width: 15px; height: 15px; }
+    .csv-btn.dragover { border-color: var(--accent); background: var(--accent-soft); }
+
+    .topic-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); min-height: 10px; }
+    .topic-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 7px 8px 7px 14px; border-radius: var(--radius-full);
+      background: linear-gradient(135deg, var(--accent-soft), transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+      color: var(--ink); font-size: 0.85rem; font-weight: 600;
+      animation: rise-in 300ms var(--ease) both;
+    }
+    .topic-chip button {
+      display: grid; place-items: center;
+      width: 20px; height: 20px; border-radius: 50%; border: none;
+      background: var(--score-track); color: var(--ink-soft);
+      font-size: 0.7rem; cursor: pointer; transition: all var(--fast); line-height: 1;
+    }
+    .topic-chip button:hover { background: var(--danger); color: #fff; }
+
+    .topics-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; }
+    .suggested { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+    .suggested-label { font-size: 0.75rem; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+    .suggested .chip { padding: 6px 13px; font-size: 0.78rem; }
+    .topics-actions { display: flex; gap: var(--space-2); align-items: center; }
+    .btn-clear {
+      padding: 10px 16px; border-radius: 12px;
+      border: 1px solid var(--glass-border); background: var(--glass-strong);
+      color: var(--ink-soft); font: inherit; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; transition: all var(--fast);
+    }
+    .btn-clear:hover { color: var(--danger); border-color: var(--danger); }
+
+    .topic-group {
+      margin-top: var(--space-4);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      background: var(--glass);
+      overflow: hidden;
+      animation: rise-in 420ms var(--ease) both;
+    }
+    .topic-group-head {
+      display: flex; align-items: center; gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-soft);
+      border-bottom: 1px solid var(--glass-border);
+    }
+    .topic-group-title { font-weight: 800; font-size: 1rem; color: var(--ink); letter-spacing: -0.01em; }
+    .topic-group-meta { font-size: 0.78rem; color: var(--ink-faint); }
+    .topic-group-list { display: grid; gap: 1px; background: var(--glass-border); }
+    .topic-row {
+      display: flex; align-items: center; gap: var(--space-3);
+      padding: var(--space-3) var(--space-4); background: var(--glass);
+      cursor: pointer; transition: background var(--fast); text-align: left;
+    }
+    .topic-row:hover { background: var(--accent-soft); }
+    .topic-row-score {
+      flex: none; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600;
+      padding: 4px 8px; border-radius: 8px; color: var(--ring);
+      background: color-mix(in srgb, var(--ring) 12%, transparent);
+    }
+    .topic-row-main { min-width: 0; flex: 1; }
+    .topic-row-title {
+      display: block; font-weight: 700; font-size: 0.92rem; color: var(--ink);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .topic-row:hover .topic-row-title { color: var(--accent); }
+    .topic-row-meta { font-size: 0.75rem; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+    /* Browse */
+    .browse-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+    .browse-head h2 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+    .browse-sub { font-size: 0.82rem; color: var(--ink-muted); }
+    .browse-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: var(--space-3); }
+    .browse-cat {
+      position: relative; overflow: hidden;
+      display: flex; flex-direction: column; gap: var(--space-2);
+      padding: var(--space-4);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--glass-border);
+      background: var(--glass);
+      cursor: pointer; text-align: left; font: inherit;
+      transition: all var(--fast);
+      animation: rise-in 420ms var(--ease) both;
+    }
+    .browse-cat:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--cat-color) 45%, transparent); box-shadow: var(--shadow-lift); }
+    .browse-cat::before {
+      content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--cat-color);
+    }
+    .browse-cat-label { font-weight: 800; font-size: 1rem; color: var(--ink); }
+    .browse-cat-count { font-size: 2rem; font-weight: 800; color: var(--cat-color); font-variant-numeric: tabular-nums; line-height: 1; }
+    .browse-cat-hint { font-size: 0.76rem; color: var(--ink-faint); }
+    .btn-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 12px;
+      border: 1px solid var(--glass-border); background: var(--glass);
+      color: var(--ink-soft); font: inherit; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; transition: all var(--fast);
+    }
+    .btn-back:hover { color: var(--accent); border-color: var(--accent); }
+    .btn-back svg { width: 14px; height: 14px; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      display: grid; place-items: center; padding: var(--space-4);
+      background: rgba(2, 6, 23, 0.55);
+      backdrop-filter: blur(6px);
+    }
+    .modal-overlay[hidden] { display: none; }
+    .modal-card {
+      position: relative; max-width: 560px; width: 100%;
+      background: var(--glass-strong); backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border-strong);
+      border-radius: var(--radius-lg);
+      padding: clamp(1.25rem, 3vw, 2rem);
+      box-shadow: var(--shadow-lift);
+      animation: rise-in 260ms var(--ease) both;
+      max-height: 85vh; overflow-y: auto;
+    }
+    .modal-close {
+      position: absolute; top: 14px; right: 14px;
+      display: grid; place-items: center; width: 34px; height: 34px;
+      border-radius: 50%; border: 1px solid var(--glass-border);
+      background: var(--glass); color: var(--ink-soft); cursor: pointer;
+      transition: all var(--fast);
+    }
+    .modal-close:hover { color: var(--danger); border-color: var(--danger); }
+    .modal-close svg { width: 15px; height: 15px; }
+    .modal-title { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); margin: var(--space-3) 0 var(--space-2); }
+    .modal-meta { font-size: 0.8rem; color: var(--ink-muted); display: flex; gap: 8px; flex-wrap: wrap; }
+    .modal-meta .sep { opacity: 0.5; }
+    .modal-summary { font-size: 0.95rem; color: var(--ink-soft); margin: var(--space-3) 0 var(--space-4); }
+    .modal-link { text-decoration: none; border: none; }
+
     /* ════════════════════════════════════════════════════════════════════════
        Responsive
        ════════════════════════════════════════════════════════════════════════ */
@@ -572,10 +779,16 @@
       .search-icon { position: absolute; top: 14px; left: 14px; pointer-events: none; }
       #search-input { padding-left: 40px; }
       .btn-search { justify-content: center; width: 100%; }
-      .key-row { flex-wrap: wrap; }
       .stats { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
       .stat-card { padding: var(--space-4); }
       .hero h1 { letter-spacing: -0.02em; }
+      .topic-input-row { flex-direction: column; }
+      .topic-input-row .btn-topic-add { width: 100%; padding: 12px; }
+      .csv-btn { justify-content: center; }
+      .topics-foot { flex-direction: column; align-items: stretch; }
+      .topics-actions { display: grid; grid-template-columns: 1fr 2fr; }
+      .tabbar { margin-top: calc(-1 * var(--space-4)); }
+      .tab { padding: 10px 14px; font-size: 0.85rem; }
     }
     @media (max-width: 380px) {
       .stats { grid-template-columns: 1fr; }
@@ -641,11 +854,7 @@
               Search <span class="kbd-hint">↵</span>
             </button>
           </div>
-          <div class="key-row">
-            <label for="api-key-input">API key</label>
-            <input type="password" id="api-key-input" placeholder="paste key — or open a link with ?key=…" aria-label="API key">
-            <button class="key-save" onclick="saveApiKey()">Save</button>
-          </div>
+          <p class="no-key-note" title="Public demo — read-only, no key needed"><span class="live-dot"></span>Public demo — no API key needed, read-only, rate-limited</p>
         </div>
         <div class="chips" aria-label="Try these searches">
           <button class="chip" onclick="quickSearch('AI agents')">AI agents</button>
@@ -657,13 +866,31 @@
       </section>
     </div>
 
+    <!-- ═══════════ Tab bar ═══════════ -->
+    <section class="container" aria-label="Explore">
+      <nav class="tabbar" role="tablist" aria-label="Explore tabs">
+        <button class="tab active" id="tab-search" role="tab" aria-selected="true" aria-controls="panel-search" onclick="switchTab('search')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          Search
+        </button>
+        <button class="tab" id="tab-topics" role="tab" aria-selected="false" aria-controls="panel-topics" onclick="switchTab('topics')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><circle cx="7" cy="7" r="1.2"/></svg>
+          Topic Explorer
+        </button>
+        <button class="tab" id="tab-browse" role="tab" aria-selected="false" aria-controls="panel-browse" onclick="switchTab('browse')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
+          Browse
+        </button>
+      </nav>
+    </section>
+
     <!-- ═══════════ Stats bar ═══════════ -->
     <section class="container" aria-label="Pipeline statistics">
       <div class="stats">
         <div class="stat-card" style="--stat-color:#6366f1">
           <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>Articles indexed</div>
           <div class="stat-value" id="stat-corpus">—</div>
-          <div class="stat-hint" id="stat-corpus-hint">run a search to load</div>
+          <div class="stat-hint" id="stat-corpus-hint">loading…</div>
         </div>
         <div class="stat-card" style="--stat-color:#06b6d4">
           <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>Active sources</div>
@@ -678,13 +905,13 @@
         <div class="stat-card" style="--stat-color:#10b981">
           <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Latest report</div>
           <div class="stat-value" id="stat-report-date" style="font-size:1.15rem; padding-top:6px;">—</div>
-          <div class="stat-hint" id="stat-report-hint">add key to load</div>
+          <div class="stat-hint" id="stat-report-hint">loading…</div>
         </div>
       </div>
     </section>
 
-    <!-- ═══════════ Results ═══════════ -->
-    <section class="results-section container" id="results-section">
+    <!-- ═══════════ Results (Search tab) ═══════════ -->
+    <section class="results-section container tab-panel active" id="panel-search" data-panel="search" role="tabpanel" aria-label="Search results">
       <div id="results-container">
         <div class="empty-state">
           <div class="big">🛰️</div>
@@ -694,8 +921,8 @@
       </div>
     </section>
 
-    <!-- ═══════════ Latest report ═══════════ -->
-    <section class="report-section container" id="report">
+    <!-- ═══════════ Latest report (Search tab) ═══════════ -->
+    <section class="report-section container tab-panel" id="report" data-panel="search">
       <div class="report-card">
         <div class="report-title">
           <span class="report-glyph" aria-hidden="true">📄</span>
@@ -712,6 +939,71 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
           Download PDF
         </button>
+      </div>
+    </section>
+
+    <!-- ═══════════ Topic Explorer (topics tab) ═══════════ -->
+    <section class="container tab-panel" id="panel-topics" data-panel="topics" role="tabpanel" aria-label="Topic explorer">
+      <div class="topics-card">
+        <div class="topics-head">
+          <div>
+            <h2>Topic Explorer</h2>
+            <span class="topics-sub">Watch multiple topics at once — up to 10, top 5 matches each</span>
+          </div>
+        </div>
+
+        <div class="topic-editor">
+          <div class="topic-input-row">
+            <input type="text" id="topic-input" placeholder="Add a topic and press Enter — e.g. “EU AI Act”" aria-label="Add topic" autocomplete="off" maxlength="60">
+            <button class="btn-topic-add" onclick="addTopicFromInput()">Add</button>
+            <label class="csv-btn" for="csv-file" title="Upload a CSV with one topic per line or a topic column">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+              Upload CSV
+              <input type="file" id="csv-file" accept=".csv,.txt,.tsv" hidden onchange="handleCsv(this.files)">
+            </label>
+          </div>
+          <div class="topic-chips" id="topic-chips" aria-live="polite"></div>
+          <div class="topics-foot">
+            <div class="suggested" id="suggested-topics" aria-label="Suggested topics"></div>
+            <div class="topics-actions">
+              <button class="btn-clear" id="clear-topics" onclick="clearTopics()">Clear</button>
+              <button class="btn-search" id="topics-run" onclick="runTopics()">
+                Find Matching Articles <span class="kbd-hint" id="topic-count">0</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="topics-results">
+          <div class="empty-state">
+            <div class="big">🎯</div>
+            <h3>Track what matters to you</h3>
+            <p>Add up to 10 topics (type them or upload a CSV) — we embed each topic and return the best-matching articles per topic, side by side.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ Browse (browse tab) ═══════════ -->
+    <section class="container tab-panel" id="panel-browse" data-panel="browse" role="tabpanel" aria-label="Browse by category">
+      <div class="browse-view" id="browse-grid-view">
+        <div class="browse-head">
+          <h2>Browse by Category</h2>
+          <span class="browse-sub" id="browse-total">—</span>
+        </div>
+        <div class="browse-grid" id="browse-grid">
+          <div class="empty-state"><div class="big">🗂️</div><h3>Loading categories…</h3></div>
+        </div>
+      </div>
+      <div class="browse-view" id="browse-list-view" hidden>
+        <div class="browse-head">
+          <button class="btn-back" onclick="backToCategories()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m0 0 7 7m-7-7 7-7"/></svg>
+            All categories
+          </button>
+          <h2 id="browse-list-title">Category</h2>
+        </div>
+        <div id="browse-list"></div>
       </div>
     </section>
   </main>
@@ -736,15 +1028,33 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <!-- ═══════════ Article detail modal ═══════════ -->
+  <div class="modal-overlay" id="article-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal()" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <span class="cat-badge" id="modal-cat"><span class="cat-dot"></span>category</span>
+      <h3 class="modal-title" id="modal-title">Article</h3>
+      <div class="modal-meta" id="modal-meta"></div>
+      <p class="modal-summary" id="modal-summary"></p>
+      <a class="btn-search modal-link" id="modal-link" href="#" target="_blank" rel="noopener">Open original ↗</a>
+    </div>
+  </div>
+
   <script>
     "use strict";
 
     const API_BASE = "https://r4w0f48k64.execute-api.eu-central-1.amazonaws.com/v1";
     const SOURCES_KNOWN = 44; // pipeline config: enabled sources (see config/sources.json)
+    const MAX_TOPICS = 10;
 
-    let apiKey = localStorage.getItem("news-api-key") || "";
     let latestReportUrl = null;
     let lastCorpusSize = parseInt(localStorage.getItem("news-corpus-size") || "0", 10) || null;
+    let topics = [];            // Topic Explorer chips
+    let articleCache = [];      // flattened articles for modal (index → article)
+    let suggestedTopics = [];   // from /demo/topics
+    let currentCategory = null; // browse drill-down
 
     /* ── Theme ─────────────────────────────────────────────────────────── */
     const themeToggle = document.getElementById("theme-toggle");
@@ -761,7 +1071,6 @@
       const cur = document.documentElement.getAttribute("data-theme");
       applyTheme(cur === "dark" ? "light" : "dark");
     });
-    // Follow system changes until the user explicitly toggles.
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
       if (!localStorage.getItem("news-theme")) applyTheme(e.matches ? "dark" : "light");
     });
@@ -772,6 +1081,8 @@
       "ai": "#6366f1", "tech": "#06b6d4", "security": "#f43f5e",
       "cloud": "#0ea5e9", "business": "#f59e0b", "science": "#10b981",
       "policy": "#8b5cf6", "asian": "#ec4899", "niche": "#a855f7",
+      "un": "#3b82f6", "eu_parliament": "#8b5cf6", "bundestag": "#f59e0b",
+      "major": "#6366f1", "european": "#14b8a6",
       "general": "#14b8a6", "research": "#3b82f6", "hardware": "#f97316",
     };
     function categoryColor(cat) {
@@ -786,7 +1097,6 @@
     function escapeHtml(str) {
       const div = document.createElement("div");
       div.textContent = String(str ?? "");
-      // innerHTML trick escapes & < > but not quotes — escape those too
       return div.innerHTML
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
@@ -819,29 +1129,55 @@
       requestAnimationFrame(tick);
     }
 
-    /* ── Init: URL params (?key=… &q=…) ────────────────────────────────── */
+    function errorState(container, icon, title, msg) {
+      container.innerHTML = `<div class="empty-state"><div class="big">${icon}</div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(msg)}</p></div>`;
+    }
+
+    /* ── Tabs (hash-routed: #search / #topics / #browse) ───────────────── */
+    const TABS = ["search", "topics", "browse"];
+    function switchTab(name, { push = true } = {}) {
+      if (!TABS.includes(name)) name = "search";
+      document.querySelectorAll(".tab").forEach((t) => {
+        const on = t.id === `tab-${name}`;
+        t.classList.toggle("active", on);
+        t.setAttribute("aria-selected", String(on));
+      });
+      document.querySelectorAll("[data-panel]").forEach((p) => {
+        p.classList.toggle("active", p.dataset.panel === name);
+      });
+      if (location.hash !== `#${name}`) {
+        history[push ? "pushState" : "replaceState"](null, "", `#${name}`);
+      }
+      // lazy-load Browse counts on first open
+      if (name === "browse" && !browseLoaded) loadBrowse();
+    }
+    window.addEventListener("popstate", () => switchTab((location.hash || "#search").slice(1), { push: false }));
+
+    /* ── Init: URL params (?q= &topics=) + hash ────────────────────────── */
     (function initFromUrl() {
       const params = new URLSearchParams(window.location.search);
       const urlTheme = params.get("theme");
       if (urlTheme === "dark" || urlTheme === "light") applyTheme(urlTheme);
-      const urlKey = params.get("key");
-      const urlQuery = params.get("q");
-      if (urlKey) {
-        apiKey = urlKey.trim();
-        localStorage.setItem("news-api-key", apiKey);
-        document.getElementById("api-key-input").value = apiKey;
-        params.delete("key");
-        const qs = params.toString();
-        history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
-        showToast("API key loaded from link");
-      }
+      const urlQuery = (params.get("q") || "").trim();
+      const urlTopics = (params.get("topics") || "").trim();
       if (urlQuery) document.getElementById("search-input").value = urlQuery;
-      if (urlKey && urlQuery) doSearch();
+      if (urlTopics) {
+        urlTopics.split(/[,;\n]/).map((t) => t.trim()).filter(Boolean).slice(0, MAX_TOPICS).forEach((t) => addTopic(t));
+        switchTab("topics", { push: false });
+        setTimeout(runTopics, 250);
+      } else if (urlQuery) {
+        switchTab("search", { push: false });
+        setTimeout(doSearch, 250);
+      } else {
+        switchTab((location.hash || "#search").slice(1), { push: false });
+      }
     })();
 
-    document.getElementById("api-key-input").value = apiKey;
     document.getElementById("search-input").addEventListener("keypress", (e) => {
       if (e.key === "Enter") doSearch();
+    });
+    document.getElementById("topic-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); addTopicFromInput(); }
     });
 
     /* ── Health check ──────────────────────────────────────────────────── */
@@ -866,16 +1202,7 @@
       }
     }
 
-    /* ── API key ───────────────────────────────────────────────────────── */
-    function saveApiKey() {
-      apiKey = document.getElementById("api-key-input").value.trim();
-      if (!apiKey) { showToast("Paste an API key first"); return; }
-      localStorage.setItem("news-api-key", apiKey);
-      showToast("API key saved locally");
-      loadReport();
-    }
-
-    /* ── Search ────────────────────────────────────────────────────────── */
+    /* ── Search (public /demo/search — no key) ─────────────────────────── */
     function quickSearch(q) {
       document.getElementById("search-input").value = q;
       doSearch();
@@ -894,33 +1221,26 @@
     async function doSearch() {
       const query = document.getElementById("search-input").value.trim();
       if (!query) return;
-      if (!apiKey) { showToast("Add your API key to search"); document.getElementById("api-key-input").focus(); return; }
-
+      switchTab("search", { push: false });
       const btn = document.getElementById("search-btn");
       const container = document.getElementById("results-container");
       btn.disabled = true;
       container.innerHTML = skeletons();
 
       try {
-        const resp = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}&limit=10`, {
-          headers: { "x-api-key": apiKey },
-        });
-        if (resp.status === 403) {
-          container.innerHTML = `<div class="empty-state"><div class="big">🔑</div><h3>Invalid API key</h3><p>The key was rejected by API Gateway. Check the key and try again.</p></div>`;
-          return;
-        }
+        const resp = await fetch(`${API_BASE}/demo/search?q=${encodeURIComponent(query)}&limit=10`);
         if (resp.status === 429) {
-          container.innerHTML = `<div class="empty-state"><div class="big">🐢</div><h3>Rate limited</h3><p>2 requests/second on this key — take a breath and retry.</p></div>`;
+          errorState(container, "🐢", "Rate limited", "The public demo is rate-limited — take a breath and retry in a few seconds.");
           return;
         }
         if (!resp.ok) {
-          container.innerHTML = `<div class="empty-state"><div class="big">⚠️</div><h3>Search error</h3><p>API returned HTTP ${resp.status}. Try again in a moment.</p></div>`;
+          errorState(container, "⚠️", "Search error", `API returned HTTP ${resp.status}. Try again in a moment.`);
           return;
         }
         const data = await resp.json();
         renderResults(data.results || [], query, data.model || "?", data.corpus_size, data.comparable_size);
       } catch (e) {
-        container.innerHTML = `<div class="empty-state"><div class="big">📡</div><h3>Search failed</h3><p>Network error reaching the API. Check your connection and try again.</p></div>`;
+        errorState(container, "📡", "Search failed", "Network error reaching the API. Check your connection and try again.");
       } finally {
         btn.disabled = false;
       }
@@ -960,7 +1280,6 @@
           ${results.map((r, i) => {
             const score = Number(r.similarity_score) || 0;
             const pct = Math.max(0, Math.min(100, score * 100));
-            const C = 2 * Math.PI * 16;
             const cat = r.category || "general";
             const color = categoryColor(cat);
             const ringColor = scoreTier(score);
@@ -991,7 +1310,6 @@
           }).join("")}
         </div>`;
 
-      // Animate score rings after paint.
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           container.querySelectorAll(".score-ring .fill").forEach((c) => {
@@ -1001,18 +1319,18 @@
       });
     }
 
-    /* ── Latest report ─────────────────────────────────────────────────── */
+    /* ── Latest report (public /demo/report/latest) ────────────────────── */
     async function loadReport() {
-      if (!apiKey) return;
       try {
-        const resp = await fetch(`${API_BASE}/report/latest`, { headers: { "x-api-key": apiKey } });
-        if (!resp.ok) return;
+        const resp = await fetch(`${API_BASE}/demo/report/latest`);
+        if (!resp.ok) {
+          document.getElementById("stat-report-hint").textContent = "no report yet";
+          return;
+        }
         const data = await resp.json();
-        const dEl = document.getElementById("report-date");
-        const aEl = document.getElementById("report-articles");
-        dEl.textContent = data.date || "—";
+        document.getElementById("report-date").textContent = data.date || "—";
         const n = parseInt(data.article_count ?? data.articles, 10);
-        if (!isNaN(n)) countUp(aEl, n);
+        if (!isNaN(n)) countUp(document.getElementById("report-articles"), n);
         document.getElementById("stat-report-date").textContent = data.date || "—";
         document.getElementById("stat-report-hint").textContent = n ? `${fmtInt(n)} articles digested` : "no digest yet";
         if (data.url) {
@@ -1026,15 +1344,319 @@
       if (latestReportUrl) window.open(latestReportUrl, "_blank", "noopener");
     }
 
+    /* ── Topic Explorer ────────────────────────────────────────────────── */
+    function addTopic(topic) {
+      topic = String(topic || "").trim();
+      if (!topic) return false;
+      if (topics.some((t) => t.toLowerCase() === topic.toLowerCase())) {
+        showToast("Topic already added");
+        return false;
+      }
+      if (topics.length >= MAX_TOPICS) {
+        showToast(`Maximum ${MAX_TOPICS} topics`);
+        return false;
+      }
+      topics.push(topic);
+      renderTopicChips();
+      return true;
+    }
+
+    function removeTopic(topic) {
+      topics = topics.filter((t) => t !== topic);
+      renderTopicChips();
+    }
+
+    function clearTopics() {
+      topics = [];
+      renderTopicChips();
+      document.getElementById("topic-input").focus();
+    }
+
+    function addTopicFromInput() {
+      const input = document.getElementById("topic-input");
+      if (addTopic(input.value)) input.value = "";
+      input.focus();
+    }
+
+    function renderTopicChips() {
+      const wrap = document.getElementById("topic-chips");
+      wrap.innerHTML = topics.map((t) => `
+        <span class="topic-chip">${escapeHtml(t)}
+          <button onclick="removeTopic('${escapeHtml(t).replace(/'/g, "&#39;")}')" aria-label="Remove ${escapeHtml(t)}">×</button>
+        </span>`).join("");
+      document.getElementById("topic-count").textContent = String(topics.length);
+      // suggested chips: grey out already-added topics
+      document.querySelectorAll("#suggested-topics .chip").forEach((c) => {
+        c.disabled = topics.some((t) => t.toLowerCase() === c.textContent.trim().toLowerCase());
+        c.style.opacity = c.disabled ? "0.35" : "1";
+      });
+    }
+
+    async function loadSuggestedTopics() {
+      try {
+        const resp = await fetch(`${API_BASE}/demo/topics`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        suggestedTopics = (data.topics || []).slice(0, 8);
+        const wrap = document.getElementById("suggested-topics");
+        if (!suggestedTopics.length) return;
+        wrap.innerHTML = `<span class="suggested-label">Try:</span>` +
+          suggestedTopics.map((t) => `<button class="chip" onclick="addTopic('${escapeHtml(t).replace(/'/g, "&#39;")}')">${escapeHtml(t)}</button>`).join("");
+      } catch (e) { /* silent — suggestions are optional */ }
+    }
+
+    async function runTopics() {
+      if (!topics.length) {
+        showToast("Add at least one topic");
+        document.getElementById("topic-input").focus();
+        return;
+      }
+      const btn = document.getElementById("topics-run");
+      const container = document.getElementById("topics-results");
+      btn.disabled = true;
+      container.innerHTML = skeletons(3);
+
+      try {
+        const resp = await fetch(`${API_BASE}/demo/search-by-topics`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topics, per_topic: 5 }),
+        });
+        if (resp.status === 429) {
+          errorState(container, "🐢", "Rate limited", "The public demo is rate-limited — take a breath and retry in a few seconds.");
+          return;
+        }
+        if (!resp.ok) {
+          errorState(container, "⚠️", "Topic search error", `API returned HTTP ${resp.status}. Try again in a moment.`);
+          return;
+        }
+        const data = await resp.json();
+        renderTopicResults(data.topics || [], data.comparable_size, data.model);
+      } catch (e) {
+        errorState(container, "📡", "Request failed", "Network error reaching the API. Check your connection and try again.");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function renderTopicResults(groups, comparable, model) {
+      const container = document.getElementById("topics-results");
+      articleCache = [];
+      const total = groups.reduce((sum, g) => sum + g.count, 0);
+      if (!total) {
+        container.innerHTML = `<div class="empty-state"><div class="big">🤷</div><h3>No matches above the relevance threshold</h3><p>None of your topics matched the current corpus (${fmtInt(comparable || 0)} articles, ${escapeHtml(model || "")}). Try broader phrasing or different topics.</p></div>`;
+        return;
+      }
+      container.innerHTML = `
+        <div class="results-head">
+          <div class="results-title">${groups.length} topic${groups.length === 1 ? "" : "s"} · ${total} matching article${total === 1 ? "" : "s"}</div>
+          <div class="results-meta">top ${Math.max(...groups.map((g) => g.results.length))} per topic · corpus ${fmtInt(comparable || 0)} · <span class="mono">${escapeHtml(model || "")}</span></div>
+        </div>
+        ${groups.map((g, gi) => `
+          <div class="topic-group" style="animation-delay:${gi * 70}ms">
+            <div class="topic-group-head">
+              <span class="topic-group-title">${escapeHtml(g.topic)}</span>
+              <span class="topic-group-meta">${g.count} match${g.count === 1 ? "" : "es"}</span>
+            </div>
+            <div class="topic-group-list">
+              ${g.results.map((r) => {
+                const score = Number(r.similarity_score) || 0;
+                const pct = Math.round(Math.max(0, Math.min(100, score * 100)));
+                const idx = articleCache.length;
+                articleCache.push(r);
+                return `
+                <div class="topic-row" style="--ring:${scoreTier(score)}" onclick="openArticleAt(${idx})" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){event.preventDefault();openArticleAt(${idx});}">
+                  <span class="topic-row-score">${pct}%</span>
+                  <span class="topic-row-main">
+                    <span class="topic-row-title">${escapeHtml(r.title || "Untitled")}</span>
+                    <span class="topic-row-meta">${escapeHtml(r.source || "")} · ${escapeHtml(r.date || "")}${r.category ? " · " + escapeHtml(r.category) : ""}</span>
+                  </span>
+                </div>`;
+              }).join("") || `<div class="topic-row"><span class="topic-row-meta" style="cursor:default">No articles above the threshold for this topic</span></div>`}
+            </div>
+          </div>`).join("")}`;
+    }
+
+    /* ── CSV upload (Topic Explorer) ───────────────────────────────────── */
+    function handleCsv(files) {
+      const file = files && files[0];
+      if (!file) return;
+      if (file.size > 1024 * 1024) { showToast("CSV too large (max 1 MB)"); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = parseCsv(String(reader.result || ""));
+          if (!parsed.length) { showToast("No topics found in CSV"); return; }
+          const before = topics.length;
+          parsed.forEach((t) => addTopic(t));
+          const added = topics.length - before;
+          showToast(added ? `Added ${added} topic${added === 1 ? "" : "s"} from CSV` : "No new topics (duplicates or limit reached)");
+        } catch (e) {
+          showToast("Could not parse CSV");
+        }
+      };
+      reader.onerror = () => showToast("Could not read file");
+      reader.readAsText(file);
+    }
+
+    function parseCsv(text) {
+      const clean = String(text || "").replace(/^\uFEFF/, "").trim();
+      if (!clean) return [];
+      const lines = clean.split(/\r?\n/).filter((l) => l.trim());
+      // delimiter detection: compare counts in the first line(s)
+      const sample = lines.slice(0, Math.min(5, lines.length)).join("\n");
+      const counts = { ",": 0, ";": 0, "\t": 0 };
+      for (const ch of Object.keys(counts)) {
+        counts[ch] = sample.split(ch).length - 1;
+      }
+      const delim = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+      const usesDelim = counts[delim] > 0;
+
+      let rows = lines.map((l) => (usesDelim ? l.split(delim) : [l])).map((c) => c.map((v) => v.replace(/^["'](.*)["']$/, "$1").trim()));
+      if (!rows.length) return [];
+
+      // header detection: first row cells that are non-numeric short words
+      const header = rows[0];
+      const looksHeader = header.some((c) => /^topic/i.test(c) || /^(keyword|interest|label|name|category|theme)$/i.test(c));
+      let colIdx = 0;
+      if (looksHeader) {
+        const idx = header.findIndex((c) => /^topic/i.test(c) || /^(keyword|interest|label|name|category|theme)$/i.test(c));
+        colIdx = Math.max(0, idx);
+        rows = rows.slice(1);
+      }
+      const out = [];
+      for (const row of rows) {
+        const val = (row[colIdx] || "").trim();
+        if (val) out.push(val);
+      }
+      return out;
+    }
+
+    /* ── Browse ────────────────────────────────────────────────────────── */
+    let browseLoaded = false;
+    let browseCategories = [];
+
+    async function loadBrowse() {
+      const grid = document.getElementById("browse-grid");
+      try {
+        const resp = await fetch(`${API_BASE}/demo/browse`);
+        if (resp.status === 429) {
+          grid.innerHTML = `<div class="empty-state"><div class="big">🐢</div><h3>Rate limited</h3><p>Retry in a few seconds.</p></div>`;
+          return;
+        }
+        if (!resp.ok) {
+          grid.innerHTML = `<div class="empty-state"><div class="big">⚠️</div><h3>Browse error</h3><p>API returned HTTP ${resp.status}.</p></div>`;
+          return;
+        }
+        const data = await resp.json();
+        browseCategories = data.categories || [];
+        browseLoaded = true;
+        const total = data.total || 0;
+        document.getElementById("browse-total").textContent = `${fmtInt(total)} articles across ${browseCategories.length} categories`;
+        // stats bar: articles indexed (first load wins; search may update later)
+        const corpusEl = document.getElementById("stat-corpus");
+        if (!lastCorpusSize) countUp(corpusEl, total, { duration: 900 });
+        document.getElementById("stat-corpus-hint").textContent = lastCorpusSize ? `updated just now` : "live count";
+        if (!lastCorpusSize) document.getElementById("stat-corpus").textContent = fmtInt(total);
+
+        grid.innerHTML = browseCategories.map((c, i) => {
+          const color = categoryColor(c.id);
+          return `
+            <button class="browse-cat" style="--cat-color:${color}; animation-delay:${Math.min(i * 45, 400)}ms" onclick="openCategory('${escapeHtml(c.id)}')">
+              <span class="browse-cat-count">${fmtInt(c.count)}</span>
+              <span class="browse-cat-label">${escapeHtml(c.label || c.id)}</span>
+              <span class="browse-cat-hint">${c.count ? "show articles →" : "no articles yet"}</span>
+            </button>`;
+        }).join("");
+      } catch (e) {
+        grid.innerHTML = `<div class="empty-state"><div class="big">📡</div><h3>Couldn't load categories</h3><p>Network error — try again.</p></div>`;
+      }
+    }
+
+    async function openCategory(catId, label) {
+      const listEl = document.getElementById("browse-list");
+      document.getElementById("browse-grid-view").hidden = true;
+      document.getElementById("browse-list-view").hidden = false;
+      document.getElementById("browse-list-title").textContent = label || catId;
+      listEl.innerHTML = skeletons(2);
+      try {
+        const resp = await fetch(`${API_BASE}/demo/articles?category=${encodeURIComponent(catId)}&limit=20`);
+        if (!resp.ok) {
+          errorState(listEl, "⚠️", "Error", `API returned HTTP ${resp.status}.`);
+          return;
+        }
+        const data = await resp.json();
+        if (!data.articles || !data.articles.length) {
+          listEl.innerHTML = `<div class="empty-state"><div class="big">📭</div><h3>No articles in this category yet</h3><p>Check back after the next pipeline run (daily 05:00 UTC).</p></div>`;
+          return;
+        }
+        articleCache = data.articles;
+        listEl.innerHTML = `<div class="topic-group" style="margin-top:0">
+          <div class="topic-group-list">
+            ${data.articles.map((r, idx) => `
+              <div class="topic-row" role="button" tabindex="0" onclick="openArticleAt(${idx})" onkeydown="if(event.key==='Enter'){event.preventDefault();openArticleAt(${idx});}">
+                <span class="topic-row-main">
+                  <span class="topic-row-title">${escapeHtml(r.title || "Untitled")}</span>
+                  <span class="topic-row-meta">${escapeHtml(r.source || "")} · ${escapeHtml(r.date || "")}</span>
+                </span>
+                <span class="browse-cat-hint">details →</span>
+              </div>`).join("")}
+          </div>
+        </div>`;
+      } catch (e) {
+        errorState(listEl, "📡", "Couldn't load articles", "Network error — try again.");
+      }
+    }
+
+    function backToCategories() {
+      document.getElementById("browse-list-view").hidden = true;
+      document.getElementById("browse-grid-view").hidden = false;
+    }
+
+    /* ── Article modal ─────────────────────────────────────────────────── */
+    function openArticleAt(idx) {
+      openArticle(articleCache[idx]);
+    }
+    function openArticle(article) {
+      const modal = document.getElementById("article-modal");
+      document.getElementById("modal-title").textContent = article.title || "Untitled";
+      const cat = article.category || "";
+      const catEl = document.getElementById("modal-cat");
+      catEl.innerHTML = `<span class="cat-dot"></span>${escapeHtml(cat || "article")}`;
+      catEl.style.setProperty("--cat-color", categoryColor(cat));
+      catEl.style.color = categoryColor(cat);
+      document.getElementById("modal-meta").innerHTML =
+        `<span>${escapeHtml(article.source || "")}</span><span class="sep">·</span><span class="date mono">${escapeHtml(article.date || "")}</span>`;
+      document.getElementById("modal-summary").textContent = article.summary || "(no summary available — open the original article)";
+      const link = document.getElementById("modal-link");
+      link.href = article.url || "#";
+      modal.hidden = false;
+      document.body.style.overflow = "hidden";
+    }
+    function closeModal() {
+      document.getElementById("article-modal").hidden = true;
+      document.body.style.overflow = "";
+    }
+    document.getElementById("article-modal").addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeModal();
+    });
+
     /* ── Boot ──────────────────────────────────────────────────────────── */
+    // v1 leftovers cleanup: any stored API key is obsolete — the demo is public.
+    localStorage.removeItem("news-api-key");
     document.getElementById("stat-sources").textContent = SOURCES_KNOWN;
     if (lastCorpusSize) {
       document.getElementById("stat-corpus").textContent = fmtInt(lastCorpusSize);
-      document.getElementById("stat-corpus-hint").textContent = "cached · search to refresh";
+      document.getElementById("stat-corpus-hint").textContent = "cached · search or browse to refresh";
     }
     checkHealth();
     setInterval(checkHealth, 60000);
-    if (apiKey) loadReport();
+    loadReport();
+    loadSuggestedTopics();
+    renderTopicChips();
   </script>
 </body>
 </html>
