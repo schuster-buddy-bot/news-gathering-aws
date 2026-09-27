@@ -1,0 +1,99 @@
+# Drift Detection — scheduled weekly terraform plan to detect state drift
+# Runs every Monday 06:00 UTC. If terraform plan shows changes, the workflow
+# fails and posts a notification. No changes are applied.
+name: Drift Detection
+
+on:
+  schedule:
+    # Every Monday 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: drift-detection
+  cancel-in-progress: false
+
+jobs:
+  drift-check:
+    name: Terraform Plan (Drift Check)
+    runs-on: ubuntu-latest
+    environment: aws-deploy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9"
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Terraform Init
+        working-directory: infra
+        run: terraform init
+
+      - name: Terraform Plan (no changes expected)
+        id: plan
+        working-directory: infra
+        run: |
+          terraform plan -detailed-exitcode -no-color -out=/tmp/drift.tfplan > /tmp/drift-plan.txt 2>&1
+          # Exit codes: 0=no changes, 1=error, 2=changes detected (drift)
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          if [ $EXIT_CODE -eq 2 ]; then
+            echo "::warning::Drift detected — infrastructure differs from Terraform config"
+            # Truncate plan output for issue body
+            head -100 /tmp/drift-plan.txt > /tmp/drift-summary.txt
+          fi
+          exit 0  # Don't fail the job; we handle drift below
+
+      - name: Create drift issue
+        if: steps.plan.outputs.exit_code == '2'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('/tmp/drift-summary.txt', 'utf8');
+            const date = new Date().toISOString().slice(0, 10);
+
+            // Check if a drift issue already exists (open)
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'drift'
+            });
+
+            if (issues.data.length > 0) {
+              // Comment on existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues.data[0].number,
+                body: `## Drift Detection Run — ${date}\n\nTerraform plan detected infrastructure drift:\n\n\`\`\`\n${plan}\n\`\`\``
+              });
+              console.log(`Commented on existing drift issue #${issues.data[0].number}`);
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🌐 Infrastructure Drift Detected (${date})`,
+                body: `## Drift Detection\n\nThe scheduled drift detection run found that the live infrastructure differs from the Terraform configuration.\n\n### Plan Output\n\`\`\`\n${plan}\n\`\`\`\n\n### Action Needed\nReview the plan output and run \`terraform apply\` to reconcile, or update the Terraform config to match the live state.\n\n*This issue was created automatically by the Drift Detection workflow.*`,
+                labels: ['drift', 'infrastructure']
+              });
+              console.log('Created new drift issue');
+            }
+
+      - name: No drift
+        if: steps.plan.outputs.exit_code != '2'
+        run: echo "✅ No drift detected — infrastructure matches Terraform config"

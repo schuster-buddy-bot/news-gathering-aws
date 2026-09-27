@@ -27,6 +27,29 @@ jobs:
       - name: Ruff check
         run: ruff check .
 
+  terraform-check:
+    name: Terraform (fmt + validate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9"
+          terraform_wrapper: false
+
+      - name: Terraform fmt check
+        working-directory: infra
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init (mock)
+        working-directory: infra
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        working-directory: infra
+        run: terraform validate -no-color
+
   test:
     name: Tests (pytest)
     runs-on: ubuntu-latest
