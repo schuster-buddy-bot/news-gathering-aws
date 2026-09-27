@@ -690,6 +690,75 @@ def score_relevance(articles: list[dict[str, Any]], profile: list[float], profil
     return count
 
 
+# ─── Daily report corpus loader ─────────────────────────────────────────────
+
+def _load_articles_for_report(today: str, min_threshold: int = 10) -> list[dict[str, Any]]:
+    """Load articles from DynamoDB for today's report.
+
+    Scans the articles table for items with ``first_seen == today``.  When
+    that yields fewer than ``min_threshold`` articles (e.g. the daily run
+    only added a handful of new items because most feeds were already seen
+    by yesterday's run), also include articles from the previous day so the
+    PDF is never near-empty.
+
+    Items are returned with the fields the PDF generator expects:
+    title, url, source, category, summary, first_seen, relevance_score.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    def _scan_for_date(date_str: str) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        kwargs = {
+            "FilterExpression": "first_seen = :d",
+            "ExpressionAttributeValues": {":d": date_str},
+        }
+        resp = ARTICLES_TABLE.scan(**kwargs)
+        items.extend(resp.get("Items", []))
+        while "LastEvaluatedKey" in resp:
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+            resp = ARTICLES_TABLE.scan(**kwargs)
+            items.extend(resp.get("Items", []))
+        return items
+
+    today_items = _scan_for_date(today)
+    if len(today_items) >= min_threshold:
+        articles = today_items
+    else:
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        yesterday_items = _scan_for_date(yesterday)
+        # Merge: today's articles first, then yesterday's (dedup by url_hash)
+        seen_hashes = {a.get("url_hash") for a in today_items}
+        articles = list(today_items)
+        for a in yesterday_items:
+            if a.get("url_hash") not in seen_hashes:
+                articles.append(a)
+                seen_hashes.add(a.get("url_hash"))
+        logger.info(
+            "Report corpus: %s from today + %s from yesterday (%s total)",
+            len(today_items), len(yesterday_items), len(articles),
+        )
+
+    # Normalize DynamoDB types (Decimal -> float) and ensure required fields
+    cleaned: list[dict[str, Any]] = []
+    for a in articles:
+        entry = {
+            "title": a.get("title", ""),
+            "url": a.get("url", ""),
+            "source": a.get("source", ""),
+            "category": a.get("category", "niche"),
+            "summary": a.get("summary", ""),
+            "first_seen": a.get("first_seen", ""),
+            "description": a.get("summary", ""),  # for importance scoring
+        }
+        if a.get("relevance_score") is not None:
+            entry["relevance_score"] = float(a["relevance_score"])
+        if a.get("embedding"):
+            entry["embedding"] = a["embedding"]
+            entry["embedding_model"] = a.get("embedding_model", "")
+        cleaned.append(entry)
+    return cleaned
+
+
 # ─── Pipeline ────────────────────────────────────────────────────────────────
 
 def run_pipeline(force: bool = False) -> dict[str, Any]:
@@ -828,11 +897,25 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
             embedding_count, len(filtered), embedding_model, stored,
         )
 
-    # Step 7: Categorize
+    # Step 7: Build the daily report from ALL articles seen today (not just
+    # new-since-last-run).  The cross-run dedup above prevents re-processing
+    # articles already fetched on a prior run, but the daily PDF should
+    # reflect the full day's digest — including articles that were first seen
+    # earlier today (e.g. from a manual re-run) or, when today's run added
+    # very few new items, articles from the previous day so the report is
+    # never near-empty.
+    #
+    # Strategy: scan DynamoDB for items with first_seen == today.  If that
+    # yields fewer than 10 articles, also include first_seen == yesterday to
+    # produce a meaningful digest.
+    report_articles = _load_articles_for_report(today, min_threshold=10)
+
+    # Step 7b: Categorize (all 7 categories matching sources.json)
     by_category: dict[str, list[dict[str, Any]]] = {
+        "un": [], "eu_parliament": [], "bundestag": [],
         "major": [], "niche": [], "european": [], "asian": [],
     }
-    for a in filtered:
+    for a in report_articles:
         cat = a.get("category", "niche")
         by_category.setdefault(cat if cat in by_category else "niche", []).append(a)
 
@@ -843,7 +926,7 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
         "sources_fetched": len(enabled_sources),
         "total_articles": len(all_articles),
         "after_dedup": len(new_articles),
-        "curated": len(filtered),
+        "curated": len(report_articles),
     }
     pdf_bytes = generate_report_pdf(
         by_category, stats, today,
@@ -876,7 +959,7 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
     REPORTS_TABLE.put_item(Item={
         "date": today,
         "s3_key": pdf_key,
-        "article_count": len(filtered),
+        "article_count": len(report_articles),
         "sources_fetched": len(enabled_sources),
         "total_raw": len(all_articles),
         "ai_summaries": ai_count,
@@ -890,7 +973,7 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
         "total_raw": len(all_articles),
         "after_in_batch_dedup": len(unique_articles),
         "skipped_already_seen": skipped_seen,
-        "curated": len(filtered),
+        "curated": len(report_articles),
         "ai_summaries": ai_count,
         "ai_enabled": ai_enabled,
         "embeddings": embedding_count,

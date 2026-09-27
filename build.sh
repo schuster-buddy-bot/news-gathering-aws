@@ -18,27 +18,22 @@ mkdir -p build/pipeline build/api
 cp lambda_handler.py pdf_generator.py embeddings.py source_authority.py build/pipeline/
 cp api_handler.py search_handler.py embeddings.py source_authority.py build/api/
 
+# API Lambda needs a recent boto3/botocore — the Lambda runtime's built-in
+# version (~1.34) has a presigned-URL bug that truncates the SigV4 service
+# name to "s" instead of "s3", producing broken download links.
+# We bundle the same pinned versions used by the pipeline.
 echo "Installing dependencies for Python ${PYV} (${PLATFORM})..."
-if ! python3 -m pip install \
-    --target build/pipeline \
-    --python-version "${PYV}" \
-    --platform "${PLATFORM}" \
-    --implementation cp \
-    --only-binary=:all: \
-    --upgrade \
-    --quiet \
-    -r requirements.txt 2>/dev/null; then
-    # Older pip or externally-managed env: retry with compatibility flags
-    python3 -m pip install \
-        --target build/pipeline \
-        --python-version "${PYV}" \
-        --platform "${PLATFORM}" \
-        --implementation cp \
-        --only-binary=:all: \
-        --upgrade \
-        --quiet \
-        --break-system-packages \
-        -r requirements.txt
+
+PIP_INSTALL="python3 -m pip install --python-version ${PYV} --platform ${PLATFORM} --implementation cp --only-binary=:all: --upgrade --quiet"
+
+if ! ${PIP_INSTALL} --target build/pipeline -r requirements.txt 2>/dev/null; then
+    ${PIP_INSTALL} --break-system-packages --target build/pipeline -r requirements.txt
+fi
+
+# Install boto3+botocore into api build too (fixes presigned URL bug)
+API_DEPS="boto3==1.43.91"
+if ! ${PIP_INSTALL} --target build/api ${API_DEPS} 2>/dev/null; then
+    ${PIP_INSTALL} --break-system-packages --target build/api ${API_DEPS}
 fi
 
 echo "Build complete:"

@@ -9,7 +9,7 @@ infra/.terraform.lock.hcl.bak
 infra/*.tfstate
 infra/*.tfstate.*
 infra/*.tfvars
-infra/tfplan
+infra/tfplan*
 infra/crash.log
 
 # OS
