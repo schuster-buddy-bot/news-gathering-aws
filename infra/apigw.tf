@@ -142,7 +142,7 @@ locals {
   }
 
   cors_allow_headers = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-api-key'"
-  cors_allow_methods = "'GET,OPTIONS'"
+  cors_allow_methods = "'GET,POST,OPTIONS'"
   cors_allow_origin  = "'*'"
 }
 
@@ -217,6 +217,17 @@ resource "aws_api_gateway_deployment" "api" {
       aws_api_gateway_method.options,
       aws_api_gateway_method_response.options,
       aws_api_gateway_integration_response.options,
+      aws_api_gateway_resource.demo,
+      aws_api_gateway_resource.demo_first,
+      aws_api_gateway_resource.demo_second,
+      aws_api_gateway_method.demo,
+      aws_api_gateway_integration.demo,
+      aws_api_gateway_method.demo_options,
+      aws_api_gateway_integration.demo_options,
+      aws_api_gateway_method_response.demo_options,
+      aws_api_gateway_integration_response.demo_options,
+      aws_api_gateway_gateway_response.config_error_429,
+      aws_api_gateway_gateway_response.server_error_429,
     ]))
   }
 
@@ -230,6 +241,10 @@ resource "aws_api_gateway_deployment" "api" {
     aws_api_gateway_integration.search_get,
     aws_api_gateway_method.search_get,
     aws_api_gateway_integration_response.options,
+    aws_api_gateway_integration.demo,
+    aws_api_gateway_integration_response.demo_options,
+    aws_api_gateway_gateway_response.config_error_429,
+    aws_api_gateway_gateway_response.server_error_429,
   ]
 }
 
@@ -237,6 +252,15 @@ resource "aws_api_gateway_stage" "v1" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   deployment_id = aws_api_gateway_deployment.api.id
   stage_name    = "v1"
+
+  # Access logging (audit trail — see demo-api.tf log format)
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.apigw_access.arn
+    format          = local.apigw_access_log_format
+  }
+
+  # account-level CloudWatch role must exist before logging is enabled
+  depends_on = [aws_api_gateway_account.cloudwatch]
 
   tags = {
     Project = var.project
