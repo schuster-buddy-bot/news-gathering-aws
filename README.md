@@ -1,10 +1,17 @@
 # news-gathering-aws — Serverless AI News Pipeline
 
+[![CI](https://github.com/schuster-buddy-bot/news-gathering-aws/actions/workflows/ci.yml/badge.svg)](https://github.com/schuster-buddy-bot/news-gathering-aws/actions/workflows/ci.yml)
+[![Security](https://github.com/schuster-buddy-bot/news-gathering-aws/actions/workflows/security.yml/badge.svg)](https://github.com/schuster-buddy-bot/news-gathering-aws/actions/workflows/security.yml)
+[![Deploy](https://github.com/schuster-buddy-bot/news-gathering-aws/actions/workflows/deploy.yml/badge.svg)](https://github.com/schuster-buddy-bot/news-gathering-aws/actions/workflows/deploy.yml)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![Terraform](https://img.shields.io/badge/Terraform-%7E1.9-7B42BC?style=flat&logo=terraform&logoColor=white)](https://terraform.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A 100 % serverless news pipeline on AWS: **44 RSS sources → deduplication → filtering →
 AI summaries → embeddings → semantic search → daily PDF report**, plus a secured REST API.
 Built entirely within the AWS free tier (target: ~$0/month).
 
-**Live API:** `https://r4w0f48k64.execute-api.eu-central-1.amazonaws.com/v1`
+📋 **Architecture diagram:** [docs/architecture.html](docs/architecture.html) (open in browser)
 
 ## Features
 
@@ -194,15 +201,20 @@ aws lambda invoke --function-name news-pipeline-pipeline \
 
 ## Cost (AWS Always-Free / Free Tier)
 
-| Service | Usage | Free tier | ~Cost |
+All AWS services run within the Always-Free or 12-month Free Tier. Measured usage as of 2026-09-27:
+
+| Service | Actual Usage | Free Tier Allowance | Cost |
 |---|---|---|---|
-| Lambda | 2 runs/day × ~90 s × 512 MB | 1M req + 400K GB-s/month | $0 |
-| DynamoDB | ~300 items × 14 d + scans | 25 GB + 25 RCU/25 WCU always free | $0 |
-| S3 | 14 PDFs × ~100 KB + configs | 5 GB (12 mo) | $0 |
-| API Gateway REST | demo traffic | 1M calls (12 mo) | $0 |
+| Lambda | ~2 runs/day × ~90 s × 512 MB ≈ 90 GB-s/mo | 1M req + 400,000 GB-s/month | $0 |
+| DynamoDB | ~300 items × 14 d retention, <1 GB | 25 GB + 25 RCU/25 WCU always-free | $0 |
+| S3 | ~50 MB (PDFs + JSON + config) | 5 GB (12-month) | $0 |
+| API Gateway | <100 calls/month (demo) | 1M calls (12-month) | $0 |
 | EventBridge | 1 schedule | free | $0 |
 | SSM | 4 parameters | free tier | $0 |
-| **Total** | | | **~$0/month** |
+| CloudWatch | ~50 MB logs | 10 GB/month free | $0 |
+| **AWS Total** | | | **$0/month** |
+
+External: Ollama API for AI summaries — ~$0.50/month depending on plan (not billed through AWS).
 
 ## Repository layout
 
