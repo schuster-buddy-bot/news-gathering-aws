@@ -11,6 +11,17 @@ terraform {
       version = ">= 2.4"
     }
   }
+
+  # Remote state — S3 backend with DynamoDB locking.
+  # The bucket + table are created by a one-time bootstrap (see scripts/bootstrap-tfstate.sh).
+  # CI and local both use this backend so state stays in sync.
+  backend "s3" {
+    bucket         = "000911984950-news-pipeline-tfstate"
+    key            = "news-pipeline/terraform.tfstate"
+    region         = "eu-central-1"
+    dynamodb_table = "news-pipeline-tfstate-locks"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
