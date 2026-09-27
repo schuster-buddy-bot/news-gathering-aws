@@ -49,6 +49,7 @@ jobs:
         run: |
           test -f build/pipeline/lambda_handler.py || { echo "Missing pipeline build"; exit 1; }
           test -f build/api/api_handler.py || { echo "Missing api build"; exit 1; }
+          test -f build/api/demo_handler.py || { echo "Missing demo build"; exit 1; }
           echo "Build OK — pipeline: $(du -sh build/pipeline | cut -f1), api: $(du -sh build/api | cut -f1)"
 
       - name: Setup Terraform

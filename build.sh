@@ -2,7 +2,7 @@
 # build.sh — prepare Lambda deployment packages for Terraform's archive_file.
 #
 #   build/pipeline/  lambda_handler.py + pdf_generator.py + pip deps
-#   build/api/       api_handler.py (stdlib + boto3 only)
+#   build/api/       api_handler.py + search_handler.py + demo_handler.py
 #
 # Deps are installed pinned to the Lambda runtime (Python 3.12, manylinux2014)
 # so no platform-incompatible wheels sneak in.
