@@ -1,0 +1,280 @@
+{
+  "sources": [
+    {
+      "name": "OpenAI News",
+      "url": "https://openai.com/news/rss.xml",
+      "category": "major",
+      "enabled": true
+    },
+    {
+      "name": "Google AI Blog",
+      "url": "https://blog.google/technology/ai/rss/",
+      "category": "major",
+      "enabled": true
+    },
+    {
+      "name": "MIT Technology Review AI",
+      "url": "https://www.technologyreview.com/topic/artificial-intelligence/feed/",
+      "category": "major",
+      "enabled": true
+    },
+    {
+      "name": "Hugging Face Blog",
+      "url": "https://huggingface.co/blog/feed.xml",
+      "category": "major",
+      "enabled": true
+    },
+    {
+      "name": "MarkTechPost",
+      "url": "https://www.marktechpost.com/feed/",
+      "category": "major",
+      "enabled": true
+    },
+    {
+      "name": "The Verge AI",
+      "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+      "category": "major",
+      "enabled": true
+    },
+    {
+      "name": "VentureBeat AI",
+      "url": "https://venturebeat.com/category/ai/feed/",
+      "category": "major",
+      "enabled": true
+    },
+    {
+      "name": "arXiv cs.AI",
+      "url": "https://rss.arxiv.org/rss/cs.AI",
+      "category": "major",
+      "enabled": true
+    },
+    {
+      "name": "Ahead of AI (Raschka)",
+      "url": "https://magazine.sebastianraschka.com/feed",
+      "category": "niche",
+      "enabled": true
+    },
+    {
+      "name": "The Gradient",
+      "url": "https://thegradient.pub/rss/",
+      "category": "niche",
+      "enabled": true
+    },
+    {
+      "name": "Last Week in AI",
+      "url": "https://lastweekin.ai/feed",
+      "category": "niche",
+      "enabled": true
+    },
+    {
+      "name": "Simon Willison's Blog",
+      "url": "https://simonwillison.net/atom/everything/",
+      "category": "niche",
+      "enabled": true
+    },
+    {
+      "name": "LangChain Blog",
+      "url": "https://blog.langchain.dev/feed.xml",
+      "category": "niche",
+      "enabled": true
+    },
+    {
+      "name": "NVIDIA Technical Blog",
+      "url": "https://developer.nvidia.com/blog/feed/",
+      "category": "niche",
+      "enabled": true
+    },
+    {
+      "name": "Apple ML Research",
+      "url": "https://machinelearning.apple.com/rss.xml",
+      "category": "niche",
+      "enabled": true
+    },
+    {
+      "name": "KDnuggets",
+      "url": "https://www.kdnuggets.com/feed",
+      "category": "niche",
+      "enabled": true
+    },
+    {
+      "name": "Distill",
+      "url": "https://distill.pub/rss.xml",
+      "category": "niche",
+      "enabled": true
+    },
+    {
+      "name": "Roboflow Blog",
+      "url": "https://blog.roboflow.com/feed/",
+      "category": "niche",
+      "enabled": true
+    },
+    {
+      "name": "HEISE AI (Germany)",
+      "url": "https://www.heise.de/developer/rss/news-atom.xml",
+      "category": "european",
+      "enabled": true
+    },
+    {
+      "name": "The Decoder (Germany)",
+      "url": "https://the-decoder.com/feed/",
+      "category": "european",
+      "enabled": true
+    },
+    {
+      "name": "Silicon UK AI",
+      "url": "https://www.silicon.co.uk/artificial-intelligence/feed",
+      "category": "european",
+      "enabled": true
+    },
+    {
+      "name": "France 24 AI",
+      "url": "https://www.france24.com/en/artificial-intelligence/rss",
+      "category": "european",
+      "enabled": true
+    },
+    {
+      "name": "AI Business (UK)",
+      "url": "https://aibusiness.com/feed.xml",
+      "category": "european",
+      "enabled": true
+    },
+    {
+      "name": "InfoQ AI/ML/Data",
+      "url": "https://feed.infoq.com/ai-ml-data-engineering",
+      "category": "european",
+      "enabled": true
+    },
+    {
+      "name": "Le Monde AI (France)",
+      "url": "https://www.lemonde.fr/actualite-de-l-intelligence-artificielle/rss_full.xml",
+      "category": "european",
+      "enabled": true
+    },
+    {
+      "name": "Euronews Tech",
+      "url": "https://www.euronews.com/rss?format=xml",
+      "category": "european",
+      "enabled": true
+    },
+    {
+      "name": "EUobserver",
+      "url": "https://euobserver.com/rss",
+      "category": "european",
+      "enabled": true
+    },
+    {
+      "name": "Pandaily (China Tech)",
+      "url": "https://pandaily.com/feed/",
+      "category": "asian",
+      "enabled": true
+    },
+    {
+      "name": "Synced (China AI)",
+      "url": "https://syncedreview.com/feed/",
+      "category": "asian",
+      "enabled": true
+    },
+    {
+      "name": "SCMP Tech",
+      "url": "https://www.scmp.com/rss/4/feed",
+      "category": "asian",
+      "enabled": true
+    },
+    {
+      "name": "Japan Times Tech",
+      "url": "https://www.japantimes.co.jp/tech/feed/",
+      "category": "asian",
+      "enabled": true
+    },
+    {
+      "name": "Nikkei Asia (Japan)",
+      "url": "https://www.nikkei.com/rss/",
+      "category": "asian",
+      "enabled": true
+    },
+    {
+      "name": "Korea Herald",
+      "url": "https://www.koreaherald.com/rss/",
+      "category": "asian",
+      "enabled": true
+    },
+    {
+      "name": "Tech in Asia",
+      "url": "https://www.techinasia.com/feed",
+      "category": "asian",
+      "enabled": true
+    },
+    {
+      "name": "Analytics India Mag",
+      "url": "https://analyticsindiamag.com/feed/",
+      "category": "asian",
+      "enabled": false
+    },
+    {
+      "name": "AI China",
+      "url": "https://www.aichina.org/feed/",
+      "category": "asian",
+      "enabled": false
+    },
+    {
+      "name": "UN News — Peace & Security",
+      "url": "https://news.un.org/feed/subscribe/en/news/topic/peace-and-security/feed/rss.xml",
+      "category": "un",
+      "enabled": true
+    },
+    {
+      "name": "UN News — Human Rights",
+      "url": "https://news.un.org/feed/subscribe/en/news/topic/human-rights/feed/rss.xml",
+      "category": "un",
+      "enabled": true
+    },
+    {
+      "name": "UN News — Climate & Environment",
+      "url": "https://news.un.org/feed/subscribe/en/news/topic/climate-change/feed/rss.xml",
+      "category": "un",
+      "enabled": true
+    },
+    {
+      "name": "UN News — Humanitarian Aid",
+      "url": "https://news.un.org/feed/subscribe/en/news/topic/humanitarian-aid/feed/rss.xml",
+      "category": "un",
+      "enabled": true
+    },
+    {
+      "name": "EU Parliament — Press Releases",
+      "url": "https://www.europarl.europa.eu/rss/doc/press-releases/en.xml",
+      "category": "eu_parliament",
+      "enabled": true
+    },
+    {
+      "name": "EU Parliament — Plenary Press Releases",
+      "url": "https://www.europarl.europa.eu/rss/doc/press-releases-plenary/en.xml",
+      "category": "eu_parliament",
+      "enabled": true
+    },
+    {
+      "name": "EU Parliament — News Articles",
+      "url": "https://www.europarl.europa.eu/rss/doc/articles/en.xml",
+      "category": "eu_parliament",
+      "enabled": true
+    },
+    {
+      "name": "Bundestag — Aktuelle Themen",
+      "url": "https://www.bundestag.de/static/appdata/includes/rss/aktuellethemen.rss",
+      "category": "bundestag",
+      "enabled": true
+    },
+    {
+      "name": "Bundestag — Pressemitteilungen",
+      "url": "https://www.bundestag.de/static/appdata/includes/rss/pressemitteilungen.rss",
+      "category": "bundestag",
+      "enabled": true
+    },
+    {
+      "name": "Bundestag — Kurzmeldungen (hib)",
+      "url": "https://www.bundestag.de/static/appdata/includes/rss/hib.rss",
+      "category": "bundestag",
+      "enabled": true
+    }
+  ]
+}

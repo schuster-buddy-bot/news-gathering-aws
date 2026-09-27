@@ -1,0 +1,31 @@
+{
+  "archive": {
+    "base_path": "03-RESOURCES/news-archive",
+    "retention_days": 30,
+    "save_individual_articles": true
+  },
+  "fetch": {
+    "timeout_seconds": 10,
+    "max_articles_per_feed": 10,
+    "retry_attempts": 1,
+    "retry_delay_seconds": 30,
+    "parallel_fetches": 10
+  },
+  "filtering": {
+    "mode": "include_only",
+    "min_title_length": 10,
+    "unfiltered_categories": ["un", "eu_parliament", "bundestag"]
+  },
+  "summarization": {
+    "enabled": true,
+    "max_summary_length": 150
+  },
+  "telegram": {
+    "enabled": true,
+    "digest_title": "📰 News Daily"
+  },
+  "alerting": {
+    "alert_on_percent_failed": 50,
+    "alert_on_consecutive_failures": 3
+  }
+}

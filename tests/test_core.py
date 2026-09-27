@@ -14,7 +14,7 @@ import pytest
 
 from embeddings import DEFAULT_DIMS, cosine_similarity, hashed_embedding, pack_base64, unpack_base64
 from lambda_handler import article_fingerprint, clean_summary, matches_filters, normalize_title
-from pdf_generator import _clean_for_pdf
+from pdf_generator import _clean_text as _clean_for_pdf
 
 
 # ─── article_fingerprint ─────────────────────────────────────────────────────
