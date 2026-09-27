@@ -94,15 +94,22 @@ def _info() -> dict:
             "GET /health": "Service health check (public)",
             "GET /search?q=&limit=": "Semantic search (x-api-key required)",
             "GET /report/latest": "Latest daily report (x-api-key required)",
+            "GET /demo/search?q=&limit=": "Semantic search (public demo, throttled)",
+            "GET /demo/report/latest": "Latest daily report (public demo)",
+            "GET /demo/topics": "Predefined demo topics + categories (public)",
+            "POST /demo/search-by-topics": "Multi-topic search (public demo)",
+            "GET /demo/browse": "Article counts per category (public demo)",
+            "GET /demo/articles?category=&limit=": "Recent articles by category (public demo)",
         },
     })
 
 
-def _latest_report() -> dict:
+def latest_report() -> dict:
     """Return metadata + presigned URL for the latest report.
 
     Scans the reports table (one item per day, small table) and picks the
-    newest date.
+    newest date. Public so the read-only demo handler can reuse it verbatim
+    (same payload format, no duplicated presign logic).
 
     Returns:
         Proxy response with report metadata and a presigned PDF URL,
@@ -177,6 +184,6 @@ def lambda_handler(event: dict, context) -> dict:
     if normalized == "/health":
         return _health()
     if normalized == "/report/latest":
-        return _latest_report()
+        return latest_report()
 
     return _response(404, {"error": "not_found", "path": path})

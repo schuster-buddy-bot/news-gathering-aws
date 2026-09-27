@@ -1,0 +1,25 @@
+{
+  "topics": [
+    "AI agents",
+    "machine learning",
+    "cloud architecture",
+    "security",
+    "DevOps",
+    "EU AI Act",
+    "EU regulation",
+    "UN peacekeeping",
+    "Bundestag",
+    "quantum computing"
+  ],
+  "categories": [
+    {"id": "un", "label": "UN"},
+    {"id": "eu_parliament", "label": "EU Parliament"},
+    {"id": "bundestag", "label": "Bundestag"},
+    {"id": "major", "label": "Major AI"},
+    {"id": "niche", "label": "Niche"},
+    {"id": "european", "label": "European"},
+    {"id": "asian", "label": "Asian"}
+  ],
+  "updated_at": "2026-09-27",
+  "comment": "Predefined topics + category labels for the public demo UI (Topic Explorer + Browse tab). Editable in S3 without redeploy (s3://<config-bucket>/config/demo_topics.json). Max 10 topics per /demo/search-by-topics request."
+}
