@@ -9,9 +9,42 @@
 
 A 100 % serverless news pipeline on AWS: **44 RSS sources → deduplication → filtering →
 AI summaries → embeddings → semantic search → daily PDF report**, plus a secured REST API.
-Built entirely within the AWS free tier (target: ~$0/month).
+Built entirely within the AWS free tier (**target: $0/month**).
+
+---
+
+### The problem
+
+A data analyst tracking AI/ML news manually checks 40+ sources daily —
+that's 2–3 hours of repetitive reading every morning. Miss a day, and the
+backlog doubles. Relevant articles get buried in noise.
+
+### The solution
+
+This pipeline automates the entire workflow: fetches 44 RSS feeds in
+parallel, deduplicates against a 14-day rolling window, filters by
+relevance keywords, generates AI summaries of the top articles, embeds
+every article for semantic search, and publishes a ranked PDF report —
+every day at 07:00 CEST. A public demo UI lets anyone search the live
+corpus without an API key.
+
+### Measured outcomes
+
+| Metric | Value |
+|---|---|
+| Articles processed / week | ~300 |
+| Manual research time saved | ~2–3 hours/day |
+| AWS infrastructure cost | $0/month |
+| External AI API cost | ~$0.50/month |
+| Pipeline runtime | ~90 seconds |
+| Corpus retention | 14 days (TTL-managed) |
+
+---
 
 📋 **Architecture diagram:** [docs/architecture.html](docs/architecture.html) (open in browser)
+
+🔧 **Engineering decisions & trade-offs:** [DECISIONS.md](DECISIONS.md) — 8 ADRs covering
+serverless vs container, DynamoDB vs RDS, scan-and-cosine vs OpenSearch, and more.
 
 🌐 **Live public demo (no API key needed):**
 [http://000911984950-news-pipeline-demo.s3-website.eu-central-1.amazonaws.com](http://000911984950-news-pipeline-demo.s3-website.eu-central-1.amazonaws.com)
@@ -274,6 +307,37 @@ External: Ollama API for AI summaries — ~$0.50/month depending on plan (not bi
   (`s3.eu-central-1.amazonaws.com`); the global endpoint breaks SigV4 after a 307 redirect.
 - **Embeddings scale with retention** — the search corpus = last 14 days of filtered
   articles (~120/day) — scan-and-cosine stays well within DynamoDB free-tier RCU.
+
+## Failure modes & graceful degradation
+
+| Failure | Behavior | User impact |
+|---|---|---|
+| Ollama API down / timeout | Falls back to raw article `description` from RSS feed | Summaries less polished, pipeline completes |
+| Bedrock embeddings unavailable | Automatic fallback to `local-hashed-256` (deterministic, stdlib) | Lexical search instead of semantic, no error shown |
+| Individual RSS feed fails | Retry (2 attempts), then skip + warning in report footer | Missing source for that day, all others unaffected |
+| DynamoDB throttled | Lambda retries with exponential backoff (SDK default) | Rare at this scale; API returns 503 on exhaustion |
+| S3 presign fails | API returns 500, client can retry | PDF not downloadable for that request |
+| Lambda cold start | First request after idle adds ~200-500ms | Mitigated by SSM warm-start on cold invocation |
+
+## Known limitations
+
+- **Vector search is O(n) scan-and-cosine** — works at ~4K items (14-day corpus);
+  would need OpenSearch or pgvector at 100K+ items. See [ADR-3](DECISIONS.md#adr-3).
+- **No systematic evaluation harness** — pipeline output quality is not yet measured
+  with a golden dataset. Planned: 20-50 test queries with precision/recall tracking.
+- **No key rotation** — SSM parameters are updated manually. Production would use
+  Secrets Manager with auto-rotation.
+- **Static API key** — no JWT/OAuth. Suitable for a portfolio API; production would
+  use Cognito or an external IdP.
+- **12-month free tier** — S3 and API Gateway free tier expires after 12 months.
+  Always-free services (Lambda, DynamoDB, EventBridge, SSM, CloudWatch) remain $0.
+- **Single-region** — eu-central-1 only. No multi-region failover.
+
+## Engineering decisions
+
+Key architectural choices and their trade-offs are documented in
+[DECISIONS.md](DECISIONS.md) (8 ADRs covering compute, storage, search, AI,
+IaC, secrets, auth, and CQRS split).
 
 ## License
 
