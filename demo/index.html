@@ -31,8 +31,8 @@
       --glass-border-strong: rgba(15, 23, 42, 0.14);
       --ink: #0f172a;
       --ink-soft: #3d4a63;
-      --ink-muted: #64748b;
-      --ink-faint: #94a3b8;
+      --ink-muted: #51607a;
+      --ink-faint: #5e6e88;
 
       --accent: #4f46e5;
       --accent-2: #7c3aed;
@@ -71,7 +71,7 @@
       --ink: #e6ebf7;
       --ink-soft: #b7c1d8;
       --ink-muted: #8b96b0;
-      --ink-faint: #5b6680;
+      --ink-faint: #74839f;
       --accent: #818cf8;
       --accent-2: #a78bfa;
       --accent-3: #22d3ee;
@@ -114,19 +114,29 @@
     }
     .skip-link:focus { left: var(--space-3); top: var(--space-3); }
 
-    .container { max-width: 1180px; margin-inline: auto; padding-inline: clamp(1.25rem, 4vw, 2.5rem); }
+    .container { max-width: 1080px; margin-inline: auto; padding-inline: clamp(1.25rem, 4vw, 2.5rem); }
+
+    /* ════════════════════════════════════════════════════════════════════════
+       Layout consistency — single max-width for ALL content sections.
+       No stair-stepping: search, stats, results, report, tabs, how-it-works
+       all share the same width so left/right edges align on every screen.
+       ════════════════════════════════════════════════════════════════════════ */
+    .tabbar { justify-content: center; }
 
     /* ════════════════════════════════════════════════════════════════════════
        Navbar
        ════════════════════════════════════════════════════════════════════════ */
     .navbar {
       position: sticky; top: 0; z-index: 100;
-      display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
-      padding: var(--space-3) clamp(1.25rem, 4vw, 2.5rem);
       background: var(--glass-strong);
       backdrop-filter: blur(16px) saturate(1.4);
       -webkit-backdrop-filter: blur(16px) saturate(1.4);
       border-bottom: 1px solid var(--glass-border);
+    }
+    .navbar-inner {
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+      max-width: 1080px; margin-inline: auto;
+      padding: var(--space-3) clamp(1.25rem, 4vw, 2.5rem);
     }
     .brand {
       display: flex; align-items: center; gap: var(--space-2);
@@ -255,7 +265,7 @@
     /* Search — floating glass bar overlapping hero bottom */
     .search-shell { position: relative; margin-top: calc(-1 * clamp(2rem, 5vw, 3.2rem)); z-index: 5; }
     .search-card {
-      max-width: 720px; margin-inline: auto;
+      max-width: 680px; margin-inline: auto;
       background: var(--glass);
       backdrop-filter: blur(20px) saturate(1.5);
       -webkit-backdrop-filter: blur(20px) saturate(1.5);
@@ -302,7 +312,7 @@
 
     .key-row {
       display: flex; align-items: center; gap: var(--space-2);
-      max-width: 720px; margin: var(--space-3) auto 0;
+      max-width: 680px; margin: var(--space-3) auto 0;
       padding: 0 var(--space-2);
     }
     .key-row label { font-size: 0.8rem; font-weight: 600; color: var(--ink-muted); white-space: nowrap; }
@@ -316,7 +326,7 @@
 
     .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: center; margin-top: var(--space-5); }
     .chip {
-      padding: 8px 16px; border-radius: var(--radius-full);
+      padding: 11px 18px; min-height: 44px; display: inline-flex; align-items: center; border-radius: var(--radius-full);
       border: 1px solid var(--glass-border); background: var(--glass);
       color: var(--ink-soft); font-size: 0.82rem; font-weight: 600;
       cursor: pointer; transition: all var(--fast);
@@ -324,11 +334,20 @@
     }
     .chip:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--accent) 50%, transparent); }
 
+    /* Stat loading skeletons — same shimmer as result skeletons */
+    .skel-stat {
+      border-radius: 6px; height: 1.5rem; width: 58%;
+      background: linear-gradient(100deg, var(--score-track) 35%, color-mix(in srgb, var(--accent) 16%, var(--score-track)) 50%, var(--score-track) 65%);
+      background-size: 240% 100%;
+      animation: shimmer 1.4s linear infinite;
+    }
+    .skel-stat.hint { height: 0.72rem; width: 40%; margin-top: 7px; }
+
     /* ════════════════════════════════════════════════════════════════════════
        Stats bar
        ════════════════════════════════════════════════════════════════════════ */
     .stats {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4);
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--space-4);
       margin-top: var(--space-7);
     }
     .stat-card {
@@ -362,7 +381,7 @@
     /* ════════════════════════════════════════════════════════════════════════
        Results
        ════════════════════════════════════════════════════════════════════════ */
-    .results-section { padding: var(--space-8) 0 var(--space-6); }
+    .results-section { padding: var(--space-8) 0 var(--space-6); text-align: center; }
     .results-head {
       display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
       flex-wrap: wrap; margin-bottom: var(--space-5);
@@ -372,7 +391,7 @@
     .results-meta { font-size: 0.82rem; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
     .results-meta .mono { font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-faint); }
 
-    .result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: var(--space-4); }
+    .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: var(--space-4); }
 
     .result-card {
       position: relative; display: flex; flex-direction: column; gap: var(--space-3);
@@ -448,7 +467,7 @@
     .empty-state .err { color: var(--danger); }
 
     /* Skeletons */
-    .skeleton-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: var(--space-4); }
+    .skeleton-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: var(--space-4); }
     .skel-card {
       background: var(--glass); border: 1px solid var(--glass-border);
       border-radius: var(--radius-lg); padding: var(--space-5);
@@ -766,15 +785,15 @@
     .modal-link { text-decoration: none; border: none; }
 
     /* ── How it works ── */
-    .howitworks { margin: var(--space-6) 0 var(--space-5); }
-    .howitworks-row { display: flex; align-items: center; justify-content: center; gap: var(--space-3); flex-wrap: wrap; }
-    .how-step { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--glass-border); background: var(--glass); cursor: help; transition: all var(--fast); }
+    .howitworks { margin: var(--space-6) auto var(--space-5); }
+    .howitworks-row { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; align-items: center; gap: var(--space-3); max-width: 920px; margin-inline: auto; }
+    .how-step { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-2); padding: var(--space-4) var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--glass-border); background: var(--glass); cursor: help; transition: all var(--fast); }
     .how-step:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-card); }
     .how-icon { font-size: 1.5rem; flex: none; }
     .how-label { font-size: 0.82rem; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
     .how-desc { font-size: 0.72rem; color: var(--ink-faint); line-height: 1.3; }
-    .how-arrow { color: var(--ink-faint); font-size: 1.2rem; opacity: 0.5; }
-    @media (max-width: 640px) { .how-arrow { display: none; } .how-step { flex: 1 1 calc(50% - 1rem); } }
+    .how-arrow { display: flex; align-items: center; justify-content: center; color: var(--ink-faint); font-size: 1.2rem; opacity: 0.5; }
+    @media (max-width: 640px) { .howitworks-row { grid-template-columns: 1fr 1fr; gap: var(--space-3); } .how-arrow { display: none; } }
 
     /* ── Info boxes ── */
     .info-box { display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); border-radius: var(--radius-md); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); background: var(--accent-soft); font-size: 0.85rem; color: var(--ink-soft); line-height: 1.5; }
@@ -788,7 +807,7 @@
     .csv-note { font-size: 0.78rem; color: var(--ink-faint); }
 
     /* ── Results score tip ── */
-    .results-tip { font-size: 0.78rem; color: var(--ink-faint); margin-top: var(--space-1); padding: var(--space-1) var(--space-3); border-radius: var(--radius-sm); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent); }
+    .results-tip { font-size: 0.74rem; color: var(--ink-muted); margin-top: var(--space-1); }
 
     /* ════════════════════════════════════════════════════════════════════════
        Responsive
@@ -797,9 +816,14 @@
       .stats { grid-template-columns: repeat(2, 1fr); }
       .report-card { flex-direction: column; align-items: flex-start; }
     }
+    @media (min-width: 1280px) {
+      .container { max-width: 1120px; }
+    }
     @media (max-width: 640px) {
       .gh-link span { display: none; }
       .gh-link { padding: 8px 10px; }
+      .navbar-inner { padding-inline: 1rem; }
+      .health-pill { padding: 5px 10px; font-size: 0.72rem; }
       .search-row { flex-direction: column; position: relative; }
       .search-icon { position: absolute; top: 14px; left: 14px; pointer-events: none; }
       #search-input { padding-left: 40px; }
@@ -830,6 +854,7 @@
 
   <!-- ═══════════ Navbar ═══════════ -->
   <nav class="navbar">
+    <div class="navbar-inner">
     <a href="/" class="brand">
       <span class="brand-mark">📰</span>
       <span>News&nbsp;Intelligence</span>
@@ -847,6 +872,7 @@
         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         <span>GitHub</span>
       </a>
+    </div>
     </div>
   </nav>
 
@@ -942,8 +968,8 @@
       <div class="stats">
         <div class="stat-card" style="--stat-color:#6366f1">
           <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>Articles indexed</div>
-          <div class="stat-value" id="stat-corpus">—</div>
-          <div class="stat-hint" id="stat-corpus-hint">loading…</div>
+          <div class="stat-value" id="stat-corpus"><div class="skel-stat"></div></div>
+          <div class="stat-hint" id="stat-corpus-hint"><div class="skel-stat hint"></div></div>
         </div>
         <div class="stat-card" style="--stat-color:#06b6d4">
           <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>Active sources</div>
@@ -952,13 +978,13 @@
         </div>
         <div class="stat-card" style="--stat-color:#a855f7">
           <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/></svg>Region</div>
-          <div class="stat-value" id="stat-region" style="font-size:1.15rem; padding-top:6px;">…</div>
-          <div class="stat-hint" id="stat-version">API v—</div>
+          <div class="stat-value" id="stat-region" style="font-size:1.15rem; padding-top:6px;"><div class="skel-stat"></div></div>
+          <div class="stat-hint" id="stat-version"><div class="skel-stat hint"></div></div>
         </div>
         <div class="stat-card" style="--stat-color:#10b981">
           <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Latest report</div>
-          <div class="stat-value" id="stat-report-date" style="font-size:1.15rem; padding-top:6px;">—</div>
-          <div class="stat-hint" id="stat-report-hint">loading…</div>
+          <div class="stat-value" id="stat-report-date" style="font-size:1.15rem; padding-top:6px;"><div class="skel-stat"></div></div>
+          <div class="stat-hint" id="stat-report-hint"><div class="skel-stat hint"></div></div>
         </div>
       </div>
     </section>
@@ -1153,9 +1179,9 @@ open source models</pre>
     const CATEGORY_COLORS = {
       "ai": "#6366f1", "tech": "#06b6d4", "security": "#f43f5e",
       "cloud": "#0ea5e9", "business": "#f59e0b", "science": "#10b981",
-      "policy": "#8b5cf6", "asian": "#ec4899", "niche": "#a855f7",
+      "policy": "#8b5cf6", "asian": "#ec4899", "niche": "#c026d3",
       "un": "#3b82f6", "eu_parliament": "#8b5cf6", "bundestag": "#f59e0b",
-      "major": "#6366f1", "european": "#14b8a6",
+      "major": "#2563eb", "european": "#14b8a6",
       "general": "#14b8a6", "research": "#3b82f6", "hardware": "#f97316",
     };
     function categoryColor(cat) {
@@ -1348,7 +1374,7 @@ open source models</pre>
           <div class="results-meta">
             ${results.length} results · corpus ${fmtInt(corpus || lastCorpusSize || 0)} · <span class="mono">${escapeHtml(model)}</span> · ${distinctSources} source${distinctSources === 1 ? "" : "s"} in top ${results.length}
           </div>
-          <div class="results-tip">💡 Score = cosine similarity (0–100%). Higher = more relevant. <strong>Not</strong> keyword matching — the AI understands meaning.</div>
+          <div class="results-tip">💡 Score = cosine similarity · meaning-based ranking, not keyword matching</div>
         </div>
         <div class="result-grid">
           ${results.map((r, i) => {
@@ -1615,10 +1641,14 @@ open source models</pre>
       try {
         const resp = await fetch(`${API_BASE}/demo/browse`);
         if (resp.status === 429) {
+          const cEl = document.getElementById("stat-corpus");
+          if (!lastCorpusSize) { cEl.textContent = "—"; document.getElementById("stat-corpus-hint").textContent = "rate-limited, retry shortly"; }
           grid.innerHTML = `<div class="empty-state"><div class="big">🐢</div><h3>Rate limited</h3><p>Retry in a few seconds.</p></div>`;
           return;
         }
         if (!resp.ok) {
+          const cEl = document.getElementById("stat-corpus");
+          if (!lastCorpusSize) { cEl.textContent = "—"; document.getElementById("stat-corpus-hint").textContent = "unavailable"; }
           grid.innerHTML = `<div class="empty-state"><div class="big">⚠️</div><h3>Browse error</h3><p>API returned HTTP ${resp.status}.</p></div>`;
           return;
         }
