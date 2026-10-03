@@ -13,7 +13,7 @@
 resource "aws_iam_openid_connect_provider" "github" {
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["6938fd4ed98bb0327c965147c08d2c5b0e06f9c4", "1c58d3c8509d4a3eb0271f7bd6c0f4d0b0e06f9c4"]
+  thumbprint_list = ["6938fd4ed98bb0327c965147c08d2c5b0e06f9c4"]
 }
 
 # ─── IAM Role for GitHub Actions CI/CD ───────────────────────────────────────
@@ -102,8 +102,8 @@ data "aws_iam_policy_document" "github_actions" {
 
   # IAM — pass role for Lambda functions
   statement {
-    sid    = "IAMPassRole"
-    effect = "Allow"
+    sid     = "IAMPassRole"
+    effect  = "Allow"
     actions = ["iam:PassRole"]
     resources = [
       aws_iam_role.pipeline.arn,
