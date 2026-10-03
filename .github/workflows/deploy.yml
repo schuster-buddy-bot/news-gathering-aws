@@ -1,5 +1,6 @@
 # Deploy — build Lambda packages + terraform apply + API Gateway redeployment
 # Triggers on push to main after CI passes, or manual dispatch.
+# Uses OIDC federation (keyless) — no static AWS access keys.
 name: Deploy
 
 on:
@@ -11,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write   # Required for OIDC federation (keyless AWS auth)
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -35,12 +37,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+          role-to-assume: arn:aws:iam::000911984950:role/news-pipeline-github-actions-role
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+          role-session-name: github-actions-deploy-${{ github.run_id }}
 
       - name: Build Lambda deployment packages
         run: bash build.sh
@@ -60,37 +62,24 @@ jobs:
 
       - name: Terraform Init
         working-directory: infra
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: terraform init
 
       - name: Terraform Apply
         working-directory: infra
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: terraform apply -auto-approve -input=false
 
       - name: Deploy demo UI to S3 website bucket
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
           BUCKET=$(cd infra && terraform output -raw demo_site_bucket)
           aws s3 cp demo/index.html "s3://$BUCKET/index.html" \
             --content-type "text/html; charset=utf-8" \
             --cache-control "no-cache"
+          aws s3 cp demo/lang/ "s3://$BUCKET/lang/" --recursive \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "no-cache"
           echo "Demo UI deployed to http://$BUCKET.s3-website.$AWS_DEFAULT_REGION.amazonaws.com"
 
       - name: Create API Gateway Deployment
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
           API_URL=$(cd infra && terraform output -raw api_base_url)
           API_ID=$(echo "$API_URL" | grep -oP '(?<=https://)[a-z0-9]+(?=\.)')

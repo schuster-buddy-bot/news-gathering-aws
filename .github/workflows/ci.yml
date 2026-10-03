@@ -72,4 +72,4 @@ jobs:
           AWS_ACCESS_KEY_ID: testing
           AWS_SECRET_ACCESS_KEY: testing
           AWS_DEFAULT_REGION: eu-central-1
-        run: pytest tests/ -v
+        run: pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=xml

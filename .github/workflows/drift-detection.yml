@@ -1,6 +1,7 @@
 # Drift Detection — scheduled weekly terraform plan to detect state drift
 # Runs every Monday 06:00 UTC. If terraform plan shows changes, the workflow
 # fails and posts a notification. No changes are applied.
+# Uses OIDC federation (keyless) — no static AWS access keys.
 name: Drift Detection
 
 on:
@@ -12,6 +13,7 @@ on:
 permissions:
   contents: read
   issues: write
+  id-token: write   # Required for OIDC federation
 
 concurrency:
   group: drift-detection
@@ -30,12 +32,12 @@ jobs:
           terraform_version: "~1.9"
           terraform_wrapper: false
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+          role-to-assume: arn:aws:iam::000911984950:role/news-pipeline-github-actions-role
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+          role-session-name: github-actions-drift-${{ github.run_id }}
 
       - name: Terraform Init
         working-directory: infra
@@ -45,6 +47,7 @@ jobs:
         id: plan
         working-directory: infra
         run: |
+          set +e
           terraform plan -detailed-exitcode -no-color -out=/tmp/drift.tfplan > /tmp/drift-plan.txt 2>&1
           # Exit codes: 0=no changes, 1=error, 2=changes detected (drift)
           EXIT_CODE=$?
