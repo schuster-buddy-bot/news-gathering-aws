@@ -35,14 +35,14 @@ data "aws_iam_policy_document" "github_actions_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Scoped to this repo — main branch pushes, workflow_run (deploy trigger), and manual dispatch
+    # Scoped to this repo — covers push, workflow_run, and dispatch events
+    # New GitHub OIDC format includes org/repo IDs and environment
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:schuster-buddy-bot/news-gathering-aws:ref:refs/heads/main",
-        "repo:schuster-buddy-bot/news-gathering-aws:workflow_run:*",
-        "repo:schuster-buddy-bot/news-gathering-aws:workflow_dispatch",
+        "repo:schuster-buddy-bot/news-gathering-aws:*",
+        "repo:schuster-buddy-bot@*/news-gathering-aws@*:environment:aws-deploy",
       ]
     }
   }
