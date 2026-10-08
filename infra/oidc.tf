@@ -215,16 +215,28 @@ data "aws_iam_policy_document" "github_actions" {
     sid    = "SQSManage"
     effect = "Allow"
     actions = [
-      "sqs:GetQueueAttributes",
-      "sqs:GetQueueUrl",
-      "sqs:SetQueueAttributes",
-      "sqs:CreateQueue",
-      "sqs:DeleteQueue",
-      "sqs:SendMessage",
+      "sqs:*",
     ]
     resources = [
       "arn:aws:sqs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.project}-*",
     ]
+  }
+
+  # Tag reading — Terraform reads tags on all managed resources during plan
+  # ListTagsForResource is needed across services; AWS doesn't support
+  # resource-level scoping for many of these list operations
+  statement {
+    sid    = "TagRead"
+    effect = "Allow"
+    actions = [
+      "ssm:ListTagsForResource",
+      "sqs:ListQueueTags",
+      "lambda:ListTags",
+      "dynamodb:ListTagsOfResource",
+      "apigateway:GET",
+      "events:ListTagsForResource",
+    ]
+    resources = ["*"]
   }
 
   # DynamoDB — full management for project tables
