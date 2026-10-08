@@ -21,3 +21,5 @@ infra/crash.log
 *.pem
 *.key
 secrets.json
+.venv/
+

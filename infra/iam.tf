@@ -52,23 +52,26 @@ data "aws_iam_policy_document" "pipeline" {
     resources = ["${aws_s3_bucket.reports.arn}/*"]
   }
 
-  # DynamoDB: dedup + report metadata
+  # DynamoDB: dedup + report metadata + knowledge graph
   statement {
     sid    = "DynamoDBAccess"
     effect = "Allow"
     actions = [
       "dynamodb:BatchGetItem",
+      "dynamodb:BatchWriteItem",
+      "dynamodb:DescribeTable",
+      "dynamodb:DescribeTimeToLive",
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:Query",
       "dynamodb:Scan",
+      "dynamodb:TransactWriteItems",
       "dynamodb:UpdateItem",
-      "dynamodb:DescribeTable",
-      "dynamodb:DescribeTimeToLive",
     ]
     resources = [
       aws_dynamodb_table.articles.arn,
       aws_dynamodb_table.reports.arn,
+      aws_dynamodb_table.graph.arn,
     ]
   }
 
@@ -84,6 +87,7 @@ data "aws_iam_policy_document" "pipeline" {
       "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/ollama-api-key",
       "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/ollama-model",
       "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/embedding-model",
+      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/llm-provider",
     ]
   }
 

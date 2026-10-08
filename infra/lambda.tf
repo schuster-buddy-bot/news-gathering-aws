@@ -30,6 +30,7 @@ resource "aws_lambda_function" "pipeline" {
       CONFIG_BUCKET             = aws_s3_bucket.reports.bucket
       ARTICLES_TABLE            = aws_dynamodb_table.articles.name
       REPORTS_TABLE             = aws_dynamodb_table.reports.name
+      GRAPH_TABLE               = aws_dynamodb_table.graph.name
       OLLAMA_ENDPOINT           = "https://ollama.com/api/chat"
       SSM_API_KEY_PARAM         = aws_ssm_parameter.ollama_api_key.name
       SSM_MODEL_PARAM           = aws_ssm_parameter.ollama_model.name

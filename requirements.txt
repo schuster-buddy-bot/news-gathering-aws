@@ -4,3 +4,9 @@ defusedxml==0.7.1
 reportlab==5.0.1
 requests==2.34.2
 boto3==1.43.91
+# GraphRAG + LLM orchestration (Sprint 1)
+langchain-core>=1.6
+langchain-ollama>=0.3
+langchain-aws>=1.8
+networkx>=3.7
+pydantic>=2.0

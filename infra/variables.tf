@@ -23,9 +23,15 @@ variable "embedding_model" {
 }
 
 variable "article_ttl_days" {
-  description = "DynamoDB TTL for dedup (seen-article) entries."
+  description = "DynamoDB TTL for dedup (seen-article) entries and graph items."
   type        = number
-  default     = 14
+  default     = 30
+}
+
+variable "llm_provider" {
+  description = "Default LLM provider for ERE and summaries: ollama or bedrock."
+  type        = string
+  default     = "ollama"
 }
 
 variable "report_retention_days" {

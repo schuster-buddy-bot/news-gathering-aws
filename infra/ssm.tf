@@ -1,3 +1,9 @@
+resource "aws_ssm_parameter" "llm_provider" {
+  name  = "/${var.project}/llm-provider"
+  type  = "String"
+  value = var.llm_provider
+}
+
 # Secrets are managed via SSM Parameter Store.
 #
 # The API key parameter is created with a placeholder and then set manually

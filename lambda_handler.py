@@ -20,6 +20,7 @@ Environment variables (set by Terraform):
   OLLAMA_ENDPOINT     Ollama chat API endpoint
   SSM_API_KEY_PARAM   SSM parameter holding the Ollama API key (SecureString)
   SSM_MODEL_PARAM     SSM parameter holding the Ollama model name
+  GRAPH_TABLE         DynamoDB graph table name (default news-pipeline-graph)
   MAX_SUMMARIZE       Number of top articles to AI-summarize (default 10)
   ARTICLE_TTL_DAYS    DynamoDB TTL for seen-article entries (default 14)
   REPORTS_PREFIX      S3 prefix for PDF reports (default "reports")
@@ -44,6 +45,9 @@ from typing import Any
 import boto3
 import requests
 
+import ere
+import graph_store
+import llm_factory
 from embeddings import (
     BEDROCK_PREFIX,
     FALLBACK_MODEL,
@@ -73,6 +77,7 @@ ddb_resource = boto3.resource("dynamodb")
 CONFIG_BUCKET = os.environ["CONFIG_BUCKET"]
 ARTICLES_TABLE_NAME = os.environ["ARTICLES_TABLE"]
 REPORTS_TABLE_NAME = os.environ["REPORTS_TABLE"]
+GRAPH_TABLE_NAME = os.environ.get("GRAPH_TABLE", "news-pipeline-graph")
 REPORTS_PREFIX = os.environ.get("REPORTS_PREFIX", "reports")
 ARCHIVE_PREFIX = os.environ.get("ARCHIVE_PREFIX", "archive")
 OLLAMA_ENDPOINT = os.environ.get("OLLAMA_ENDPOINT", "https://ollama.com/api/chat")
@@ -88,6 +93,11 @@ EMBEDDING_ENABLED = os.environ.get("EMBEDDING_ENABLED", "true").lower() == "true
 
 ARTICLES_TABLE = ddb_resource.Table(ARTICLES_TABLE_NAME)
 REPORTS_TABLE = ddb_resource.Table(REPORTS_TABLE_NAME)
+
+# Ensure graph_store sees the configured table name from the environment.
+if graph_store.GRAPH_TABLE_NAME != GRAPH_TABLE_NAME:
+    graph_store.GRAPH_TABLE_NAME = GRAPH_TABLE_NAME
+    graph_store._table = None
 
 # Defaults when config/config.json is absent from S3
 DEFAULT_FETCH_CONFIG = {
@@ -438,79 +448,86 @@ def clean_summary(raw: str) -> str:
     return ""
 
 
-def summarize_article(title: str, description: str, model: str, api_key: str) -> tuple[str, bool]:
-    """Summarize one article via the Ollama HTTP API.
+def summarize_article(title: str, description: str, llm: Any) -> tuple[str, bool, Any]:
+    """Summarize one article and extract entity-relation triplets.
+
+    Uses the LangChain ERE chain so the LLM returns both summary and
+    triplets in a single structured response.  Falls back to a plain
+    description summary when extraction fails.
 
     Args:
         title: Article title.
         description: Article description/body text.
-        model: Ollama model name.
-        api_key: Bearer token for the Ollama API.
+        llm: LangChain chat model from ``llm_factory.get_llm()``.
 
     Returns:
-        Tuple of (summary, used_ai). Falls back to a truncated description
-        on failure; the fallback summary may be empty when the article has
-        no description.
+        Tuple of (summary, used_ai, extraction_result).  ``extraction_result``
+        is an ``ere.ArticleExtraction`` on success, otherwise ``None``.
     """
-    desc = description[:800]
-    prompt = (
-        "Summarize this AI/data-science article in 2-3 concise sentences:\n\n"
-        f"Title: {title}\n"
-        f"Content: {desc}\n\n"
-        "Summary:"
-    )
     try:
-        resp = requests.post(
-            OLLAMA_ENDPOINT,
-            json={"model": model, "messages": [{"role": "user", "content": prompt}], "stream": False},
-            headers={"Authorization": f"Bearer {api_key}"},
-            timeout=60,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        content = (data.get("message", {}) or {}).get("content") or data.get("response") or ""
-        summary = clean_summary(content)
-        if summary and len(summary) > 20:
-            return summary, True
+        result = ere.extract_entities_and_summary(title, description, llm)
+        if isinstance(result, tuple):
+            return result[0], False, None
+        return result.summary, True, result
     except Exception as e:  # noqa: BLE001 — summarization must never break the pipeline
-        logger.warning("Summarization failed for '%s': %s", title[:50], e)
+        logger.warning("ERE/summarize failed for '%s': %s", title[:50], e)
+        return (description or "")[:200], False, None
 
-    return desc[:200], False
 
-
-def summarize_top(articles: list[dict[str, Any]]) -> tuple[int, bool]:
-    """AI-summarize the top articles by source authority, in parallel.
+def summarize_top(articles: list[dict[str, Any]]) -> tuple[int, bool, int, int, int]:
+    """AI-summarize the top articles and extract graph triplets.
 
     Args:
-        articles: Filtered article list (updated in-place with ``summary``).
+        articles: Filtered article list (updated in-place with ``summary``,
+            ``ai_summary``, and ``triplets``).
 
     Returns:
-        Tuple of (ai_summary_count, ai_enabled).
+        Tuple of (ai_summary_count, ai_enabled, ere_success_count,
+                  triplet_count, graph_node_count).
     """
     if not articles:
-        return 0, False
+        return 0, False, 0, 0, 0
 
-    model = ssm_get_cached(SSM_MODEL_PARAM)
     api_key = ssm_get_cached(SSM_API_KEY_PARAM)
-
     placeholder = not api_key or api_key == "PLACEHOLDER_SET_BY_MASTER"
     if placeholder:
         logger.warning("Ollama API key not configured (%s) — using description fallback", SSM_API_KEY_PARAM)
         for a in articles:
             a["summary"] = a["description"][:200]
-        return 0, False
+            a["ai_summary"] = False
+            a["triplets"] = []
+        return 0, False, 0, 0, 0
 
+    llm = llm_factory.get_llm()
     scored = sorted(articles, key=lambda a: SOURCE_AUTHORITY.get(a.get("source", ""), DEFAULT_AUTHORITY), reverse=True)
     top = scored[:MAX_SUMMARIZE]
     rest = scored[MAX_SUMMARIZE:]
 
     ai_success = 0
+    ere_success = 0
+    triplet_count = 0
+    graph_node_count = 0
 
     def _summarize(article: dict[str, Any]) -> None:
-        nonlocal ai_success
-        summary, used_ai = summarize_article(article["title"], article["description"], model, api_key)
+        nonlocal ai_success, ere_success, triplet_count, graph_node_count
+        summary, used_ai, extraction = summarize_article(article["title"], article["description"], llm)
         article["summary"] = summary
         article["ai_summary"] = used_ai
+        if extraction is not None:
+            article["triplets"] = extraction.triplets
+            ere_success += 1
+            triplet_count += len(extraction.triplets)
+            try:
+                entities, edges = graph_store.upsert_triplets(
+                    extraction.triplets,
+                    article["url"],
+                    article.get("published", "")[:10] or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                )
+                graph_node_count += entities
+            except Exception as e:  # noqa: BLE001 — graph upsert must never break the pipeline
+                logger.warning("Graph upsert failed for %r: %s", article["url"], e)
+        else:
+            article["triplets"] = []
         if used_ai:
             ai_success += 1
 
@@ -522,8 +539,9 @@ def summarize_top(articles: list[dict[str, Any]]) -> tuple[int, bool]:
     for a in rest:
         a["summary"] = a["description"][:200]
         a["ai_summary"] = False
+        a["triplets"] = []
 
-    return ai_success, True
+    return ai_success, True, ere_success, triplet_count, graph_node_count
 
 
 # ─── Embeddings (semantic search storage) ─────────────────────────────────
@@ -874,8 +892,8 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
     filtered = [a for a in new_articles if matches_filters(a, filters)]
     logger.info("After filtering: %s articles", len(filtered))
 
-    # Step 6: AI summarization (top articles; fallback for the rest)
-    ai_count, ai_enabled = summarize_top(filtered)
+    # Step 6: AI summarization + entity/relation extraction + graph upsert
+    ai_count, ai_enabled, ere_success, triplet_count, graph_node_count = summarize_top(filtered)
 
     # Step 6.5: Embeddings for the semantic-search corpus (DynamoDB)
     embedding_count = 0
@@ -947,6 +965,9 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
         "failed_sources": failed_sources,
         "source_warnings": source_warnings,
         "ai_summaries": ai_count,
+        "ere_success_count": ere_success,
+        "triplet_count": triplet_count,
+        "graph_node_count": graph_node_count,
         "articles": filtered,
     }
     s3_client.put_object(
@@ -976,6 +997,9 @@ def run_pipeline(force: bool = False) -> dict[str, Any]:
         "curated": len(report_articles),
         "ai_summaries": ai_count,
         "ai_enabled": ai_enabled,
+        "ere_success_count": ere_success,
+        "triplet_count": triplet_count,
+        "graph_node_count": graph_node_count,
         "embeddings": embedding_count,
         "relevance_scored": relevance_count,
         "failed_sources": failed_sources,

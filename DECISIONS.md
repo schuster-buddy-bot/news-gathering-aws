@@ -221,6 +221,78 @@ cannot write to DynamoDB even if compromised) is worth the duplication.
 | Monitoring | CloudWatch logs | X-Ray tracing + custom metrics + alerts |
 | Eval | No systematic evaluation harness | Golden dataset + regression tracking (planned) |
 | Deployment | Auto-deploy on push to main | Blue/green or canary with traffic shifting |
+| GraphRAG query | Phase 1: ERE + graph storage only | Phase 2: hybrid vector+graph `/insights` endpoint |
+
+## ADR-10 — Graph Storage: DynamoDB Adjacency List vs Amazon Neptune
+
+**Date:** 2026-10-08
+**Status:** Accepted
+
+### Context
+GraphRAG Phase 1 needs a knowledge graph to store entities and relations extracted from news articles. The graph will support multi-hop traversal for a future `/insights` endpoint.
+
+### Decision
+Use DynamoDB with an adjacency-list pattern and a reverse-traversal GSI instead of Amazon Neptune.
+
+### Rationale
+1. **Cost:** DynamoDB PAY_PER_REQUEST is $0/month when idle; Neptune serverless has a minimum hourly cost.
+2. **No VPC:** Neptune requires a VPC; DynamoDB is serverless and IAM-scoped.
+3. **Scale fit:** The daily article volume (~300) produces at most a few thousand nodes/edges, easily handled by DynamoDB queries and `batch_get_item`.
+4. **TTL symmetry:** The same `ttl` attribute can expire graph items alongside article dedup rows, keeping storage bounded.
+
+### Schema
+- `PK = NODE#<normalized_entity>`, `SK = META#` for entity metadata.
+- `SK = EDGE#<target>#<relation>` for outgoing edges.
+- GSI1 (`GSI1PK = NODE#<target>`, `GSI1SK = EDGE#<source>#<relation>`) for reverse traversal.
+
+### Trade-off
+DynamoDB is not optimized for complex graph algorithms (PageRank, betweenness). For Phase 3 we load the subgraph into NetworkX in the Lambda for metric computation, accepting the Lambda timeout and memory constraints.
+
+---
+
+## ADR-11 — LLM Orchestration: LangChain Core + Provider Factory
+
+**Date:** 2026-10-08
+**Status:** Accepted
+
+### Context
+The pipeline needs structured output (JSON triplets + summary) from a chat model. We want to switch between Ollama (today) and AWS Bedrock (future) without code changes.
+
+### Decision
+Use `langchain-core` with lightweight provider packages (`langchain-ollama`, `langchain-aws`) and a factory function `get_llm(provider, model, **kwargs)`.
+
+### Rationale
+1. **Structured output:** `with_structured_output(Pydantic, include_raw=True)` gives us typed extraction plus raw response access for debugging/fallback.
+2. **Swappable providers:** The provider name is read from SSM `/news-pipeline/llm-provider`; changing it flips the model without a redeploy.
+3. **Lazy imports:** Provider classes are imported inside the factory function so unused providers do not add cold-start cost.
+4. **Size budget:** The dependency closure (langchain-core + langchain-ollama + langchain-aws + networkx + pydantic) adds ~27MB, keeping the deploy ZIP well under 250MB.
+
+### Trade-off
+LangChain adds an abstraction layer. For a portfolio project the provider-switching and structured-output benefits outweigh the added complexity.
+
+---
+
+## ADR-12 — Graph Algorithms: NetworkX Inside the Lambda
+
+**Date:** 2026-10-08
+**Status:** Accepted
+
+### Context
+Phase 3 needs PageRank and betweenness centrality over the knowledge graph to identify influential entities in the daily report.
+
+### Decision
+Run NetworkX 3.7 inside the pipeline Lambda, loading the graph from DynamoDB into memory.
+
+### Rationale
+1. **No extra infrastructure:** NetworkX is pure Python and ships in the Lambda package.
+2. **Performance budget:** PageRank on 27K nodes completes in ~0.5s; k-sampled betweenness (`k=300`) fits within the 15-minute Lambda timeout.
+3. **Control:** The algorithm parameters and random seed are code-defined, making results reproducible.
+
+### Trade-off
+Exact betweenness centrality on large graphs is infeasible in Lambda. We will use `nx.betweenness_centrality(G, k=300, seed=42)` as an approximation and document it as such.
+
+---
+
 ## ADR-9 — OIDC Federation: Action Wildcards vs Enumerated Permissions
 
 **Date:** 2026-10-08
