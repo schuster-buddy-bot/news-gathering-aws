@@ -221,3 +221,34 @@ cannot write to DynamoDB even if compromised) is worth the duplication.
 | Monitoring | CloudWatch logs | X-Ray tracing + custom metrics + alerts |
 | Eval | No systematic evaluation harness | Golden dataset + regression tracking (planned) |
 | Deployment | Auto-deploy on push to main | Blue/green or canary with traffic shifting |
+## ADR-9 — OIDC Federation: Action Wildcards vs Enumerated Permissions
+
+**Date:** 2026-10-08
+**Status:** Accepted
+
+### Context
+The GitHub Actions OIDC role (`news-pipeline-github-actions-role`) needs permissions for `terraform apply` to manage all project resources. The initial policy used ~15 enumerated actions per service, which proved insufficient — Terraform's `plan` phase reads tags, continuous backups, bucket policies, queue attributes, and other metadata that isn't obvious from the resource declarations alone.
+
+This led to 7 iterations of fix → fail → fix cycles during the OIDC bootstrap, each requiring a full CI roundtrip (~2 min per failed deploy).
+
+### Decision
+Use **service-scoped action wildcards** (`lambda:*`, `s3:*`, `dynamodb:*`, `sqs:*`, `events:*`, `logs:*`) on **project-resource-prefix-scoped** ARNs, rather than enumerating every specific action.
+
+### Rationale
+1. **Terraform's permission surface is large and unstable** — AWS adds new read operations that Terraform calls during `plan`. Enumerated permissions break on provider updates.
+2. **Resource scoping provides the security boundary** — wildcards are on `news-pipeline-*` resources only, not account-wide.
+3. **Exceptions documented** — `apigateway:*` is scoped to the project REST API ID (not all APIs). Tag-read operations use `*` resources where AWS doesn't support resource-level scoping (documented as AWS limitation).
+4. **Self-modification prevented** — the OIDC role cannot edit its own policy (excluded from IAMManage resources).
+
+### Accepted Risks
+- **Blast radius:** A compromised Actions run can attach inline policies to pipeline/api/search/demo roles via `iam:PutRolePolicy`, then invoke Lambda functions to access project secrets (SSM SecureStrings). This is contained within the project boundary — no account pivot is possible (no trust policy edits, no CreateAccessKey, no OIDC provider mutation).
+- **Mitigation:** `aws-deploy` environment protection rules (required reviewer) should be enabled to gate deploys. See P2-4 from security review.
+
+### Alternatives Considered
+- **Enumerated actions** (rejected: 7 iterations to discover all needed permissions, fragile to provider updates)
+- **AdministratorAccess** (rejected: no resource scoping, full account access)
+- **Separate plan/apply roles** (deferred: P2 from architecture review, future work)
+
+### Related
+- Security review: `docs/reviews/2026-10-08-oidc-bootstrap-review.md`
+- IAM policy: `infra/oidc.tf`

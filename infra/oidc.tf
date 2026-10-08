@@ -42,7 +42,7 @@ data "aws_iam_policy_document" "github_actions_assume" {
       variable = "token.actions.githubusercontent.com:sub"
       values = [
         "repo:schuster-buddy-bot/news-gathering-aws:ref:refs/heads/main",
-        "repo:schuster-buddy-bot@*/news-gathering-aws@*:environment:aws-deploy",
+        "repo:schuster-buddy-bot@304074075/news-gathering-aws@1389742109:environment:aws-deploy",
       ]
     }
   }
@@ -115,6 +115,8 @@ data "aws_iam_policy_document" "github_actions" {
       "iam:ListOpenIDConnectProviders",
       "iam:UpdateRole",
       "iam:UpdateRoleDescription",
+      "iam:TagRole",
+      "iam:UntagRole",
     ]
     # NOTE: github_actions role intentionally excluded — prevents
     # self-modification / privilege escalation (critic finding 2026-10-08)
@@ -122,6 +124,8 @@ data "aws_iam_policy_document" "github_actions" {
       aws_iam_role.pipeline.arn,
       aws_iam_role.api.arn,
       aws_iam_role.search.arn,
+      aws_iam_role.demo.arn,
+      aws_iam_role.apigw_cloudwatch.arn,
     ]
   }
 
@@ -155,14 +159,17 @@ data "aws_iam_policy_document" "github_actions" {
     ]
   }
 
-  # API Gateway — full management
+  # API Gateway — management scoped to project REST API only
   statement {
     sid    = "APIGatewayManage"
     effect = "Allow"
     actions = [
       "apigateway:*",
     ]
-    resources = ["arn:aws:apigateway:${data.aws_region.current.name}::*"]
+    resources = [
+      "arn:aws:apigateway:${data.aws_region.current.name}::/restapis/${aws_api_gateway_rest_api.api.id}",
+      "arn:aws:apigateway:${data.aws_region.current.name}::/restapis/${aws_api_gateway_rest_api.api.id}/*",
+    ]
   }
 
   # CloudWatch Logs — full management for project log groups
@@ -233,7 +240,9 @@ data "aws_iam_policy_document" "github_actions" {
       "sqs:ListQueueTags",
       "lambda:ListTags",
       "dynamodb:ListTagsOfResource",
-      "apigateway:GET",
+      # NOTE: apigateway:GET excluded — it grants read access to ALL API keys
+      # in the account (including plaintext key values). Tag reading for API
+      # Gateway is covered by the scoped APIGatewayManage statement above.
       "events:ListTagsForResource",
       "cloudwatch:ListTagsForResource",
     ]
