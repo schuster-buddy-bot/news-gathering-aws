@@ -172,6 +172,20 @@ data "aws_iam_policy_document" "github_actions" {
     ]
   }
 
+  # API Gateway — read access for Terraform state (api key + account)
+  # Scoped to project API key only; account read is account-wide by AWS design
+  statement {
+    sid    = "APIGatewayRead"
+    effect = "Allow"
+    actions = [
+      "apigateway:GET",
+    ]
+    resources = [
+      "arn:aws:apigateway:${data.aws_region.current.name}::/apikeys/${aws_api_gateway_api_key.demo.id}",
+      "arn:aws:apigateway:${data.aws_region.current.name}::/account",
+    ]
+  }
+
   # CloudWatch Logs — full management for project log groups
   statement {
     sid    = "CloudWatchLogsManage"
