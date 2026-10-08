@@ -87,85 +87,54 @@ data "aws_iam_policy_document" "github_actions" {
     ]
   }
 
-  # Lambda — update function code
+  # Lambda — full management for terraform apply
   statement {
-    sid    = "LambdaUpdateCode"
+    sid    = "LambdaManage"
     effect = "Allow"
     actions = [
-      "lambda:UpdateFunctionCode",
-      "lambda:UpdateFunctionConfiguration",
-      "lambda:GetFunction",
-      "lambda:ListFunctions",
-      "lambda:PublishVersion",
-      "lambda:UpdateAlias",
+      "lambda:*",
     ]
     resources = [
       "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project}-*",
     ]
   }
 
-  # IAM — pass role for Lambda functions
+  # IAM — pass role + manage role policies for Lambda functions
   statement {
-    sid     = "IAMPassRole"
+    sid     = "IAMManage"
     effect  = "Allow"
-    actions = ["iam:PassRole"]
+    actions = [
+      "iam:PassRole",
+      "iam:GetRole",
+      "iam:GetRolePolicy",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:PutRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:GetOpenIDConnectProvider",
+      "iam:ListOpenIDConnectProviders",
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:UpdateRole",
+      "iam:UpdateRoleDescription",
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy",
+    ]
     resources = [
       aws_iam_role.pipeline.arn,
       aws_iam_role.api.arn,
       aws_iam_role.search.arn,
+      aws_iam_role.github_actions.arn,
     ]
   }
 
-  # S3 — demo site sync + report bucket management
-  statement {
-    sid    = "S3DemoSiteSync"
-    effect = "Allow"
-    actions = [
-      "s3:PutObject",
-      "s3:GetObject",
-      "s3:DeleteObject",
-      "s3:ListBucket",
-    ]
-    resources = [
-      aws_s3_bucket.reports.arn,
-      "${aws_s3_bucket.reports.arn}/*",
-    ]
-  }
-
-  # API Gateway — create deployments
-  statement {
-    sid    = "APIGatewayDeploy"
-    effect = "Allow"
-    actions = [
-      "apigateway:POST",
-      "apigateway:GET",
-      "apigateway:PATCH",
-    ]
-    resources = ["arn:aws:apigateway:${data.aws_region.current.name}::*"]
-  }
-
-  # CloudWatch Logs — for Lambda
-  statement {
-    sid    = "CloudWatchLogs"
-    effect = "Allow"
-    actions = [
-      "logs:CreateLogGroup",
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-      "logs:DescribeLogGroups",
-    ]
-    resources = [
-      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project}-*",
-      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project}-*:*",
-    ]
-  }
-
-  # Full Terraform apply needs broad IAM read (to inspect existing resources)
+  # IAM — broad read (Terraform needs to inspect existing resources)
   statement {
     sid    = "IAMRead"
     effect = "Allow"
     actions = [
       "iam:GetRole",
+      "iam:GetRolePolicy",
       "iam:ListRolePolicies",
       "iam:ListAttachedRolePolicies",
       "iam:GetOpenIDConnectProvider",
@@ -174,30 +143,75 @@ data "aws_iam_policy_document" "github_actions" {
     resources = ["*"]
   }
 
-  # SSM — read parameters (Terraform imports these as data sources)
+  # S3 — all project buckets (reports, demo, tfstate)
   statement {
-    sid    = "SSMRead"
+    sid    = "S3Manage"
+    effect = "Allow"
+    actions = [
+      "s3:*",
+    ]
+    resources = [
+      aws_s3_bucket.reports.arn,
+      "${aws_s3_bucket.reports.arn}/*",
+      "arn:aws:s3:::000911984950-news-pipeline-demo",
+      "arn:aws:s3:::000911984950-news-pipeline-demo/*",
+    ]
+  }
+
+  # API Gateway — full management
+  statement {
+    sid    = "APIGatewayManage"
+    effect = "Allow"
+    actions = [
+      "apigateway:*",
+    ]
+    resources = ["arn:aws:apigateway:${data.aws_region.current.name}::*"]
+  }
+
+  # CloudWatch Logs — full management for project log groups
+  statement {
+    sid    = "CloudWatchLogsManage"
+    effect = "Allow"
+    actions = [
+      "logs:*",
+    ]
+    resources = [
+      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project}-*",
+      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project}-*:*",
+      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/apigw/${var.project}-*",
+      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/apigw/${var.project}-*:*",
+    ]
+  }
+
+  # CloudWatch Logs — describe (needs * resource)
+  statement {
+    sid    = "CloudWatchLogsDescribe"
+    effect = "Allow"
+    actions = ["logs:DescribeLogGroups"]
+    resources = ["*"]
+  }
+
+  # SSM — read + update parameters
+  statement {
+    sid    = "SSMManage"
     effect = "Allow"
     actions = [
       "ssm:GetParameter",
       "ssm:GetParameters",
       "ssm:DescribeParameters",
+      "ssm:PutParameter",
     ]
     resources = [
       "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/*",
     ]
   }
 
-  # DynamoDB — Terraform manages these tables
+  # DynamoDB — full management for project tables
   statement {
     sid    = "DynamoDBManage"
     effect = "Allow"
     actions = [
-      "dynamodb:DescribeTable",
-      "dynamodb:DescribeTimeToLive",
-      "dynamodb:UpdateTimeToLive",
-      "dynamodb:Scan",
-      "dynamodb:GetItem",
+      "dynamodb:*",
     ]
     resources = [
       aws_dynamodb_table.articles.arn,
@@ -205,19 +219,28 @@ data "aws_iam_policy_document" "github_actions" {
     ]
   }
 
-  # EventBridge — Terraform manages the schedule rule
+  # EventBridge — manage the schedule rule
   statement {
     sid    = "EventBridgeManage"
     effect = "Allow"
     actions = [
-      "events:DescribeRule",
-      "events:ListTargets",
-      "events:PutRule",
-      "events:PutTargets",
+      "events:*",
     ]
     resources = [
       "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:rule/${var.project}-*",
     ]
+  }
+
+  # CloudWatch alarms — Terraform manages alarms
+  statement {
+    sid    = "CloudWatchAlarms"
+    effect = "Allow"
+    actions = [
+      "cloudwatch:DescribeAlarms",
+      "cloudwatch:PutMetricAlarm",
+      "cloudwatch:DeleteAlarms",
+    ]
+    resources = ["*"]
   }
 }
 
