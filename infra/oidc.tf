@@ -35,11 +35,15 @@ data "aws_iam_policy_document" "github_actions_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Scoped to this repo's main branch only
+    # Scoped to this repo — main branch pushes, workflow_run (deploy trigger), and manual dispatch
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:schuster-buddy-bot/news-gathering-aws:ref:refs/heads/main"]
+      values = [
+        "repo:schuster-buddy-bot/news-gathering-aws:ref:refs/heads/main",
+        "repo:schuster-buddy-bot/news-gathering-aws:workflow_run:*",
+        "repo:schuster-buddy-bot/news-gathering-aws:workflow_dispatch",
+      ]
     }
   }
 }
