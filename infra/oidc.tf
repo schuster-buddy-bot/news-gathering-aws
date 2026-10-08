@@ -172,8 +172,8 @@ data "aws_iam_policy_document" "github_actions" {
     ]
   }
 
-  # API Gateway — read access for Terraform state (api key + account)
-  # Scoped to project API key only; account read is account-wide by AWS design
+  # API Gateway — read access for Terraform state refresh
+  # Scoped to project resources only (api key, account, usage plans)
   statement {
     sid    = "APIGatewayRead"
     effect = "Allow"
@@ -183,6 +183,8 @@ data "aws_iam_policy_document" "github_actions" {
     resources = [
       "arn:aws:apigateway:${data.aws_region.current.name}::/apikeys/${aws_api_gateway_api_key.demo.id}",
       "arn:aws:apigateway:${data.aws_region.current.name}::/account",
+      "arn:aws:apigateway:${data.aws_region.current.name}::/usageplans/${aws_api_gateway_usage_plan.main.id}",
+      "arn:aws:apigateway:${data.aws_region.current.name}::/usageplans/${aws_api_gateway_usage_plan.demo_public.id}",
     ]
   }
 
