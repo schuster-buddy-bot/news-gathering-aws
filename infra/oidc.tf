@@ -101,8 +101,8 @@ data "aws_iam_policy_document" "github_actions" {
 
   # IAM — pass role + manage role policies for Lambda functions
   statement {
-    sid     = "IAMManage"
-    effect  = "Allow"
+    sid    = "IAMManage"
+    effect = "Allow"
     actions = [
       "iam:PassRole",
       "iam:GetRole",
@@ -185,9 +185,9 @@ data "aws_iam_policy_document" "github_actions" {
 
   # CloudWatch Logs — describe (needs * resource)
   statement {
-    sid    = "CloudWatchLogsDescribe"
-    effect = "Allow"
-    actions = ["logs:DescribeLogGroups"]
+    sid       = "CloudWatchLogsDescribe"
+    effect    = "Allow"
+    actions   = ["logs:DescribeLogGroups"]
     resources = ["*"]
   }
 
