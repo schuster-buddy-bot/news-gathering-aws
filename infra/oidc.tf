@@ -235,6 +235,7 @@ data "aws_iam_policy_document" "github_actions" {
       "dynamodb:ListTagsOfResource",
       "apigateway:GET",
       "events:ListTagsForResource",
+      "cloudwatch:ListTagsForResource",
     ]
     resources = ["*"]
   }
