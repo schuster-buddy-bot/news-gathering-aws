@@ -47,7 +47,7 @@ data "aws_iam_policy_document" "github_actions_assume" {
 resource "aws_iam_role" "github_actions" {
   name               = "${var.project}-github-actions-role"
   assume_role_policy = data.aws_iam_policy_document.github_actions_assume.json
-  description        = "Role for GitHub Actions CI/CD — Terraform deploy, Lambda updates, S3 sync"
+  description        = "Role for GitHub Actions CI/CD - Terraform deploy, Lambda updates, S3 sync"
 }
 
 # ─── Permissions: Terraform state + infra management ─────────────────────────
