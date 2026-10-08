@@ -35,13 +35,13 @@ data "aws_iam_policy_document" "github_actions_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Scoped to this repo — covers push, workflow_run, and dispatch events
+    # Scoped to this repo's main branch + aws-deploy environment
     # New GitHub OIDC format includes org/repo IDs and environment
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:schuster-buddy-bot/news-gathering-aws:*",
+        "repo:schuster-buddy-bot/news-gathering-aws:ref:refs/heads/main",
         "repo:schuster-buddy-bot@*/news-gathering-aws@*:environment:aws-deploy",
       ]
     }
@@ -113,18 +113,15 @@ data "aws_iam_policy_document" "github_actions" {
       "iam:DeleteRolePolicy",
       "iam:GetOpenIDConnectProvider",
       "iam:ListOpenIDConnectProviders",
-      "iam:CreateRole",
-      "iam:DeleteRole",
       "iam:UpdateRole",
       "iam:UpdateRoleDescription",
-      "iam:AttachRolePolicy",
-      "iam:DetachRolePolicy",
     ]
+    # NOTE: github_actions role intentionally excluded — prevents
+    # self-modification / privilege escalation (critic finding 2026-10-08)
     resources = [
       aws_iam_role.pipeline.arn,
       aws_iam_role.api.arn,
       aws_iam_role.search.arn,
-      aws_iam_role.github_actions.arn,
     ]
   }
 
@@ -191,18 +188,42 @@ data "aws_iam_policy_document" "github_actions" {
     resources = ["*"]
   }
 
-  # SSM — read + update parameters
+  # SSM — read + update project parameters
   statement {
     sid    = "SSMManage"
     effect = "Allow"
     actions = [
       "ssm:GetParameter",
       "ssm:GetParameters",
-      "ssm:DescribeParameters",
       "ssm:PutParameter",
     ]
     resources = [
       "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/*",
+    ]
+  }
+
+  # SSM — DescribeParameters (AWS requires * resource, cannot be scoped)
+  statement {
+    sid       = "SSMDescribe"
+    effect    = "Allow"
+    actions   = ["ssm:DescribeParameters"]
+    resources = ["*"]
+  }
+
+  # SQS — manage DLQ
+  statement {
+    sid    = "SQSManage"
+    effect = "Allow"
+    actions = [
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl",
+      "sqs:SetQueueAttributes",
+      "sqs:CreateQueue",
+      "sqs:DeleteQueue",
+      "sqs:SendMessage",
+    ]
+    resources = [
+      "arn:aws:sqs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.project}-*",
     ]
   }
 
@@ -231,7 +252,7 @@ data "aws_iam_policy_document" "github_actions" {
     ]
   }
 
-  # CloudWatch alarms — Terraform manages alarms
+  # CloudWatch alarms — Terraform manages project alarms
   statement {
     sid    = "CloudWatchAlarms"
     effect = "Allow"
@@ -240,7 +261,9 @@ data "aws_iam_policy_document" "github_actions" {
       "cloudwatch:PutMetricAlarm",
       "cloudwatch:DeleteAlarms",
     ]
-    resources = ["*"]
+    resources = [
+      "arn:aws:cloudwatch:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alarm:${var.project}-*",
+    ]
   }
 }
 
