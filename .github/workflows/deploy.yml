@@ -41,7 +41,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::000911984950:role/news-pipeline-github-actions-role
-          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+          aws-region: eu-central-1
           role-session-name: github-actions-deploy-${{ github.run_id }}
 
       - name: Build Lambda deployment packages
